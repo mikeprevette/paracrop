@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParaCrop - Professional Batch Cropping</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <style>
+        :root { --primary: #007bff; --success: #28a745; --dark: #1a1a1a; --border: #e0e0e0; --bulk: #6f42c1; --zip: #fd7e14; --info: #17a2b8; --danger: #ff4444; }
+        body { font-family: 'Inter', -apple-system, sans-serif; padding: 20px; background: #f4f7f9; color: #333; margin: 0; min-height: 100vh; }
+        
+        .container { max-width: 1200px; margin: 20px auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); position: relative; z-index: 1; }
+        
+        header { 
+            margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid var(--border); 
+            display: flex; justify-content: space-between; align-items: center; gap: 20px;
+        }
+
+        .file-upload-wrapper { position: relative; display: inline-block; }
+        #imageInput { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .custom-file-btn {
+            display: inline-flex; align-items: center; padding: 12px 24px;
+            background: var(--primary); color: white; border-radius: 8px;
+            font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,123,255,0.2); border: 2px solid transparent;
+        }
+        .custom-file-btn:hover { background: #0056b3; transform: translateY(-1px); }
+
+        .workspace { display: grid; grid-template-columns: 280px 1fr; gap: 30px; }
+        .sidebar { display: flex; flex-direction: column; }
+        .group-label { font-weight: 700; color: #999; margin: 15px 0 8px 0; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
+        .crop-list { display: flex; flex-direction: column; gap: 8px; }
+        .crop-btn { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 0.9rem; transition: 0.2s; text-align: left; width: 100%; box-sizing: border-box; }
+        .crop-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .status-dot { width: 8px; height: 8px; background: transparent; border-radius: 50%; border: 1px solid #ddd; flex-shrink: 0; }
+        .is-modified .status-dot { background: var(--success); border-color: var(--success); }
+        .active .status-dot { border-color: white; background: white; }
+
+        .editor-col { display: flex; flex-direction: column; align-items: flex-start; }
+        .img-container { max-height: 70vh; width: 100%; background-color: var(--dark); border-radius: 8px; overflow: hidden; display: none; }
+        img { display: block; max-width: 100%; }
+        
+        #dim-display { 
+            margin-bottom: 15px; background: var(--dark); color: #00ff88; 
+            padding: 12px 16px; border-radius: 6px; font-family: 'Courier New', monospace; 
+            font-size: 0.8rem; line-height: 1.4; width: 100%; box-sizing: border-box; 
+            border: 1px solid transparent; transition: all 0.2s;
+        }
+
+        #dim-display.warning {
+            color: var(--danger);
+            border-color: var(--danger);
+            background: rgba(255, 68, 68, 0.1);
+        }
+
+        .ui-element-box { position: absolute; background: rgba(60, 60, 60, 0.7); border: 1px solid rgba(255, 255, 255, 0.3); pointer-events: none; z-index: 10; }
+        .btn-stack { display: flex; flex-direction: column; gap: 10px; margin-top: 25px; }
+        .action-btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: bold; cursor: pointer; transition: 0.2s; color: white; }
+        .download-btn { background: var(--success); }
+        .bulk-btn { background: var(--bulk); }
+        .data-btn { background: var(--info); }
+        .action-btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(18, 18, 18, 0.98); z-index: 9999; overflow-y: auto; }
+        .modal-content { max-width: 1100px; margin: 40px auto; padding: 0 20px; color: white; }
+        .modal-header { position: sticky; top: 0; background: #121212; padding: 20px 0; display: flex; justify-content: space-between; align-items: center; z-index: 10; border-bottom: 1px solid #333; gap: 15px; }
+        
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 30px; background: #222; border-radius: 8px; overflow: hidden; }
+        .data-table th, .data-table td { text-align: left; padding: 15px; border-bottom: 1px solid #333; }
+        .data-table th { background: #333; color: var(--info); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; }
+
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 30px; padding: 40px 0; }
+        .gallery-item { background: #222; padding: 20px; border-radius: 12px; text-align: center; color: white; border: 1px solid #333; }
+        .gallery-item img { max-width: 100%; height: auto; border-radius: 6px; margin-bottom: 15px; border: 1px solid #444; }
+        
+        #drop-zone-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 123, 255, 0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; color: white; border: 8px dashed white; box-sizing: border-box; }
+    </style>
+</head>
+<body id="body-drop">
+
+<div id="drop-zone-overlay"><h2>Drop Image</h2></div>
+
+<div class="container">
+    <div id="gallery-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin:0; flex-grow: 1;">ParaCrop Export Review</h2>
+                <button class="action-btn" style="background: var(--zip); width:auto; padding: 10px 20px;" onclick="downloadAllAsZip()">Download All as ZIP</button>
+                <button class="action-btn" style="background: #444; width:auto; padding: 10px 20px;" onclick="closeModal('gallery-overlay')">Back to Editor</button>
+            </div>
+            <div id="gallery-grid" class="gallery-grid"></div>
+        </div>
+    </div>
+
+    <div id="data-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Crop Coordinate Manifest</h2>
+                <button class="action-btn" style="background: #444; width:auto; padding: 10px 20px;" onclick="closeModal('data-overlay')">Close</button>
+            </div>
+            <table class="data-table">
+                <thead><tr><th>Preset Name</th><th>Top-Left (X, Y)</th><th>Bottom-Right (X, Y)</th><th>Final Size (WxH)</th></tr></thead>
+                <tbody id="data-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <header>
+        <div class="file-upload-wrapper">
+            <label for="imageInput" class="custom-file-btn">Choose or Drop Image</label>
+            <input type="file" id="imageInput" accept="image/*">
+        </div>
+        <h2 style="margin:0;">ParaCrop</h2>
+    </header>
+
+    <div class="workspace">
+        <div class="sidebar">
+            <div id="dynamic-presets"></div>
+            <div class="group-label">Tools</div>
+            <button class="crop-btn" style="width:100%" onclick="toggleOverlays()"><span id="toggle-text">Hide UI Guides</span></button>
+
+            <div class="btn-stack">
+                <button class="action-btn download-btn" id="downloadBtn" onclick="performCrop()" disabled>Download Current</button>
+                <button class="action-btn bulk-btn" id="bulkBtn" onclick="generateGallery()" disabled>Review All Adjusted</button>
+                <button class="action-btn data-btn" id="dataBtn" onclick="showCoordinateOverlay()" disabled>View Crop Data Points</button>
+            </div>
+        </div>
+
+        <div class="editor-col">
+            <div id="dim-display">Waiting for image upload...</div>
+            <div class="img-container" id="canvas-wrapper"><img id="image"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const presetConfig = {
+        "default": { title: "16:9 cinema", group: "Horizontal", ratio: 16/9, minSize: 500, prefix: "CINEMA-169", overlays: [{ top: 5, left: 5, width: 10, height: 10 }, { top: 80, left: 10, width: 40, height: 5 }] },
+        "appbground_16-9": { title: "16:9 App Main Background", group: "Horizontal", ratio: 16/9, minSize: 800, prefix: "APP-BG", overlays: [{ top: 5, left: 5, width: 10, height: 10 }, { top: 80, left: 10, width: 40, height: 5 }] },
+        "standard_4-3": { title: "4:3 Standard", group: "Horizontal", ratio: 4/3, minSize: 500, prefix: "STD-43", overlays: [] },
+        "photo_3-2": { title: "3:2 Photo", group: "Horizontal", ratio: 3/2, minSize: 500, prefix: "PHOTO-32", overlays: [] },
+        "story_9-16": { title: "9:16 Story", group: "Vertical", ratio: 9/16, minSize: 720, prefix: "STORY-916", overlays: [{ top: 5, left: 5, width: 15, height: 5 }, { top: 85, left: 5, width: 90, height: 10 }] },
+        "social_3-4": { title: "3:4 Portrait", group: "Vertical", ratio: 3/4, minSize: 600, prefix: "PORTRAIT-34", overlays: [{ top: 10, left: 10, width: 80, height: 5 }] },
+        "classic_2-3": { title: "2:3 Classic", group: "Vertical", ratio: 2/3, minSize: 500, prefix: "CLASSIC-23", overlays: [] },
+        "square_1-1": { title: "1:1 Square", group: "Other", ratio: 1/1, minSize: 400, prefix: "SQUARE-11", overlays: [{ top: 45, left: 45, width: 10, height: 10 }] },
+        "free_form": { title: "Free Form", group: "Other", ratio: NaN, minSize: 300, prefix: "CUSTOM", overlays: [] }
+    };
+
+    let cropper, currentId = "default", currentBtn, cropMemory = {}, isSwitching = false, showOverlays = true;
+    const imgElement = document.getElementById('image');
+
+    // UI Initializer - Corrected append logic to keep event listeners alive
+    function buildPresetsUI() {
+        const container = document.getElementById('dynamic-presets');
+        container.innerHTML = '';
+        const groups = {};
+        
+        Object.entries(presetConfig).forEach(([id, cfg]) => {
+            if (!groups[cfg.group]) groups[cfg.group] = [];
+            groups[cfg.group].push({ id, ...cfg });
+        });
+
+        Object.keys(groups).forEach(groupName => {
+            const label = document.createElement('div');
+            label.className = 'group-label';
+            label.innerText = groupName;
+            container.appendChild(label);
+
+            const list = document.createElement('div');
+            list.className = 'crop-list';
+            
+            groups[groupName].forEach(cfg => {
+                const btn = document.createElement('button');
+                btn.className = `crop-btn ${cfg.id === currentId ? 'active' : ''}`;
+                btn.setAttribute('data-id', cfg.id);
+                btn.innerHTML = `<span>${cfg.title}</span> <span class="status-dot"></span>`;
+                
+                btn.addEventListener('click', () => {
+                    handlePresetChange(cfg.ratio, btn);
+                });
+
+                list.appendChild(btn);
+                if (cfg.id === currentId) currentBtn = btn;
+            });
+            container.appendChild(list);
+        });
+    }
+    buildPresetsUI();
+
+    function processFile(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            imgElement.src = e.target.result;
+            document.getElementById('canvas-wrapper').style.display = 'block';
+            if (cropper) cropper.destroy();
+            cropMemory = {};
+            document.querySelectorAll('.crop-btn').forEach(b => b.classList.remove('is-modified'));
+            ['downloadBtn', 'bulkBtn', 'dataBtn'].forEach(id => document.getElementById(id).disabled = false);
+            initCropper();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function initCropper() {
+        cropper = new Cropper(imgElement, {
+            viewMode: 1,
+            aspectRatio: presetConfig[currentId].ratio,
+            autoCropArea: 0.8,
+            crop(event) {
+                if (isSwitching) return;
+                const d = cropper.getData(true);
+                const min = presetConfig[currentId].minSize || 500;
+                const isTooSmall = Math.min(d.width, d.height) < min;
+                
+                const display = document.getElementById('dim-display');
+                display.className = isTooSmall ? 'warning' : '';
+                
+                // Displaying TL and BR coordinates
+                display.innerHTML = `Size: ${d.width}x${d.height}px | TL: ${d.x},${d.y} | BR: ${d.x+d.width},${d.y+d.height} ${isTooSmall ? ' <b>(TOO SMALL)</b>' : ''}`;
+                
+                cropMemory[currentId] = { ...d };
+                if (currentBtn) currentBtn.classList.add('is-modified');
+            },
+            ready: updateUIOverlay
+        });
+    }
+
+    function handlePresetChange(ratio, btn) {
+        if (!cropper) return;
+        isSwitching = true;
+        document.querySelectorAll('.crop-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentBtn = btn;
+        currentId = btn.getAttribute('data-id');
+        
+        cropper.setAspectRatio(ratio);
+        if (cropMemory[currentId]) {
+            cropper.setData(cropMemory[currentId]);
+        }
+        
+        updateUIOverlay();
+        setTimeout(() => { isSwitching = false; }, 150);
+    }
+
+    function updateUIOverlay() {
+        const viewBox = document.querySelector('.cropper-view-box');
+        if (!viewBox) return;
+        viewBox.querySelectorAll('.ui-element-box').forEach(el => el.remove());
+        if (!showOverlays) return;
+        
+        const overlays = presetConfig[currentId]?.overlays || [];
+        overlays.forEach(o => {
+            const div = document.createElement('div');
+            div.className = 'ui-element-box';
+            Object.assign(div.style, { 
+                top: o.top + '%', 
+                left: o.left + '%', 
+                width: o.width + '%', 
+                height: o.height + '%' 
+            });
+            viewBox.appendChild(div);
+        });
+    }
+
+    // Helper: Returns a Canvas based on stored crop data
+    function getCroppedCanvas(data) {
+        const canvas = document.createElement('canvas');
+        canvas.width = data.width;
+        canvas.height = data.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(imgElement, data.x, data.y, data.width, data.height, 0, 0, data.width, data.height);
+        return canvas;
+    }
+
+    function performCrop() {
+        if (!cropper || !cropMemory[currentId]) return;
+        const prefix = presetConfig[currentId].prefix || currentId;
+        const canvas = getCroppedCanvas(cropMemory[currentId]);
+        canvas.toBlob(blob => {
+            saveAs(blob, `${prefix}.jpg`);
+        }, 'image/jpeg', 0.95);
+    }
+
+    function generateGallery() {
+        const grid = document.getElementById('gallery-grid');
+        grid.innerHTML = '';
+        const modifiedIds = Object.keys(cropMemory);
+        
+        if (modifiedIds.length === 0) {
+            alert("Please adjust at least one crop first.");
+            return;
+        }
+        
+        modifiedIds.forEach(id => {
+            const data = cropMemory[id];
+            const canvas = getCroppedCanvas(data);
+            const item = document.createElement('div');
+            item.className = 'gallery-item';
+            
+            item.innerHTML = `
+                <img src="${canvas.toDataURL('image/jpeg', 0.5)}">
+                <span style="display:block; margin-bottom:10px; font-weight:bold;">${presetConfig[id].title}</span>
+                <button class="action-btn download-btn" onclick="downloadSingleFromGallery('${id}')">Download JPG</button>
+            `;
+            grid.appendChild(item);
+        });
+        document.getElementById('gallery-overlay').style.display = 'block';
+    }
+
+    window.downloadSingleFromGallery = (id) => {
+        const prefix = presetConfig[id].prefix || id;
+        const canvas = getCroppedCanvas(cropMemory[id]);
+        canvas.toBlob(blob => saveAs(blob, `${prefix}.jpg`), 'image/jpeg', 0.95);
+    };
+
+    async function downloadAllAsZip() {
+        const zip = new JSZip();
+        const modifiedIds = Object.keys(cropMemory);
+        
+        for (const id of modifiedIds) {
+            const canvas = getCroppedCanvas(cropMemory[id]);
+            const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));
+            zip.file(`${presetConfig[id].prefix || id}.jpg`, blob);
+        }
+        
+        const content = await zip.generateAsync({type:"blob"});
+        saveAs(content, "ParaCrop-Batch.zip");
+    }
+
+    function showCoordinateOverlay() {
+        const body = document.getElementById('data-table-body');
+        body.innerHTML = Object.entries(cropMemory).map(([id, d]) => `
+            <tr>
+                <td><b>${presetConfig[id].title}</b></td>
+                <td>${Math.round(d.x)}, ${Math.round(d.y)}</td>
+                <td>${Math.round(d.x + d.width)}, ${Math.round(d.y + d.height)}</td>
+                <td>${Math.round(d.width)} x ${Math.round(d.height)}px</td>
+            </tr>`).join('');
+        document.getElementById('data-overlay').style.display = 'block';
+    }
+
+    function toggleOverlays() {
+        showOverlays = !showOverlays;
+        document.getElementById('toggle-text').innerText = showOverlays ? "Hide UI Guides" : "Show UI Guides";
+        updateUIOverlay();
+    }
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    // Drop Zone & Input Listeners
+    document.getElementById('imageInput').addEventListener('change', (e) => processFile(e.target.files[0]));
+    
+    window.addEventListener('dragover', (e) => { 
+        e.preventDefault(); 
+        document.getElementById('drop-zone-overlay').style.display = 'flex'; 
+    });
+    
+    document.getElementById('drop-zone-overlay').addEventListener('dragleave', () => {
+        document.getElementById('drop-zone-overlay').style.display = 'none';
+    });
+    
+    window.addEventListener('drop', (e) => { 
+        e.preventDefault(); 
+        document.getElementById('drop-zone-overlay').style.display = 'none'; 
+        processFile(e.dataTransfer.files[0]); 
+    });
+</script>
+</body>
+</html>
