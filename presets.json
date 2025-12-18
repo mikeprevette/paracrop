@@ -1,11 +1,10 @@
 {
-  "default": { "title": "16:9 Default", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 500, "prefix": "default-169", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
-  "marquee_16-9": { "title": "16:9 Marquee", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 800, "prefix": "APP-BG", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
-  "standard_4-3": { "title": "4:3 Standard", "group": "Horizontal", "ratio": 1.3333333333333333, "minSize": 500, "prefix": "STD-43", "overlays": [] },
-  "photo_3-2": { "title": "3:2 Photo", "group": "Horizontal", "ratio": 1.5, "minSize": 500, "prefix": "PHOTO-32", "overlays": [] },
-  "story_9-16": { "title": "9:16 Story", "group": "Vertical", "ratio": 0.5625, "minSize": 720, "prefix": "STORY-916", "overlays": [{ "top": 5, "left": 5, "width": 15, "height": 5 }, { "top": 85, "left": 5, "width": 90, "height": 10 }] },
-  "social_3-4": { "title": "3:4 Portrait", "group": "Vertical", "ratio": 0.75, "minSize": 600, "prefix": "PORTRAIT-34", "overlays": [{ "top": 10, "left": 10, "width": 80, "height": 5 }] },
-  "classic_2-3": { "title": "2:3 Classic", "group": "Vertical", "ratio": 0.6666666666666666, "minSize": 500, "prefix": "CLASSIC-23", "overlays": [] },
-  "square_1-1": { "title": "1:1 Square", "group": "Other", "ratio": 1, "minSize": 400, "prefix": "SQUARE-11", "overlays": [{ "top": 45, "left": 45, "width": 10, "height": 10 }] },
-  "free_form": { "title": "Free Form", "group": "Other", "ratio": null, "minSize": 300, "prefix": "CUSTOM", "overlays": [] }
+  "default": { "title": "16:9 Poster", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 1080, "prefix": "16x9_poster", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
+"background_16-9": { "title": "16:9 Background", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 2160, "prefix": "16x9_background", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
+"hero_Landscape": { "title": "Hero Landscape", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 1620, "prefix": "hero_landscape", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
+"heroeRegular": { "title": "Hero Regular", "group": "Horizontal", "ratio": 1.432, "minSize": 3911, "prefix": "hero_regular", "overlays": [] },
+"hero_portrait": { "title": "Hero Portrait", "group": "Horizontal", "ratio": 1.0995, "minSize": 3638, "prefix": "hero_portrait", "overlays": [] },
+"2-3_Poster": { "title": "2:3 Poster", "group": "Vertical", "ratio": 0.6666666666666666, "minSize": 1400, "prefix": "2x3_poster", "overlays": [] },
+"2-3_Feature": { "title": "2:3 Featured", "group": "Vertical", "ratio": 0.6666666666666666, "minSize": 1400, "prefix": "2x3_feature", "overlays": [] },
+"hero_compact": { "title": "Hero Compact", "group": "Vertical", "ratio": 0.462, "minSize": 1242, "prefix": "hero_compact", "overlays": [] }
 }
