@@ -47,6 +47,8 @@
 
         .status-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #ddd; background: transparent; flex-shrink: 0; }
         .is-modified .status-dot { background: var(--success); border-color: var(--success); }
+        /* When a preset is both active (selected) and modified, show success color (override white) */
+        .crop-btn.active.is-modified .status-dot { background: var(--success); border-color: var(--success); }
         .active .status-dot { border-color: white; background: white; }
 
         .editor-col { display: flex; flex-direction: column; align-items: flex-start; }
