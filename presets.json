@@ -1,8 +1,8 @@
 {
-  "default": { "title": "16:9 Poster", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 1080, "prefix": "16x9_poster", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
+"default": { "title": "16:9 Poster", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 1080, "prefix": "16x9_poster", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
 "background_16-9": { "title": "16:9 Background", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 2160, "prefix": "16x9_background", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
 "hero_Landscape": { "title": "Hero Landscape", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 1620, "prefix": "hero_landscape", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
-"heroeRegular": { "title": "Hero Regular", "group": "Horizontal", "ratio": 1.432, "minSize": 3911, "prefix": "hero_regular", "overlays": [] },
+"heroe_Regular": { "title": "Hero Regular", "group": "Horizontal", "ratio": 1.432, "minSize": 3911, "prefix": "hero_regular", "overlays": [] },
 "hero_portrait": { "title": "Hero Portrait", "group": "Horizontal", "ratio": 1.0995, "minSize": 3638, "prefix": "hero_portrait", "overlays": [] },
 "2-3_Poster": { "title": "2:3 Poster", "group": "Vertical", "ratio": 0.6666666666666666, "minSize": 1400, "prefix": "2x3_poster", "overlays": [] },
 "2-3_Feature": { "title": "2:3 Featured", "group": "Vertical", "ratio": 0.6666666666666666, "minSize": 1400, "prefix": "2x3_feature", "overlays": [] },

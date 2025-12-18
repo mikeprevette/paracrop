@@ -197,6 +197,17 @@
     // Persisted state keys
     const STORAGE_KEY = 'paracrop_state_v1';
 
+    // Clear persisted crop settings when the page is reloaded (prevents carrying settings across refresh)
+    try {
+        const navEntries = performance.getEntriesByType ? performance.getEntriesByType('navigation') : [];
+        const nav = (navEntries && navEntries.length) ? navEntries[0] : (performance.navigation || null);
+        const isReload = nav && ((nav.type && nav.type === 'reload') || (nav.type === 1));
+        if (isReload) {
+            try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+            console.info('Paracrop: cleared persisted crop settings due to page reload');
+        }
+    } catch (e) { /* ignore */ }
+
     function saveStateToStorage() {
         try {
             const payload = { linkedState, cropMemory, adjustedState };
@@ -347,8 +358,9 @@
                 const display = document.getElementById('dim-display');
                 display.className = isTooSmall ? 'warning' : '';
                 
-                // Displaying TL and BR coordinates
-                display.innerHTML = `Size: ${d.width}x${d.height}px | TL: ${d.x},${d.y} | BR: ${d.x+d.width},${d.y+d.height} ${isTooSmall ? ' <b>(TOO SMALL)</b>' : ''}`;
+                // Displaying TL and BR coordinates (include preset minimum when too small)
+                const minText = isTooSmall ? ` <b>(TOO SMALL — min ${min}px)</b>` : '';
+                display.innerHTML = `Size: ${Math.round(d.width)}x${Math.round(d.height)}px | TL: ${Math.round(d.x)},${Math.round(d.y)} | BR: ${Math.round(d.x+d.width)},${Math.round(d.y+d.height)}${minText}`;
                 
                 // compute new center
                 const newCenter = { x: d.x + d.width/2, y: d.y + d.height/2 };
@@ -552,29 +564,52 @@
     }
 
     function generateGallery() {
-        const grid = document.getElementById('gallery-grid');
-        grid.innerHTML = '';
-        const modifiedIds = Object.keys(cropMemory);
-        
-        if (modifiedIds.length === 0) {
-            alert("Please adjust at least one crop first.");
-            return;
+        try {
+            const grid = document.getElementById('gallery-grid');
+            if (!grid) throw new Error('Gallery grid element not found');
+            grid.innerHTML = '';
+
+            // Prefer adjustedState to determine which presets the user has modified
+            const modifiedIds = Object.keys(adjustedState).filter(id => adjustedState[id]);
+
+            if (!modifiedIds || modifiedIds.length === 0) {
+                alert("Please adjust at least one crop first.");
+                return;
+            }
+
+            let anyAdded = false;
+            modifiedIds.forEach(id => {
+                try {
+                    const data = cropMemory[id];
+                    if (!data) return; // skip entries without stored crop data
+                    const canvas = getCroppedCanvas(data);
+                    const item = document.createElement('div');
+                    item.className = 'gallery-item';
+
+                    item.innerHTML = `
+                        <img src="${canvas.toDataURL('image/jpeg', 0.5)}">
+                        <span style="display:block; margin-bottom:10px; font-weight:bold;">${presetConfig[id]?.title || id}</span>
+                        <button class="action-btn download-btn" onclick="downloadSingleFromGallery('${id}')">Download JPG</button>
+                    `;
+                    grid.appendChild(item);
+                    anyAdded = true;
+                } catch (innerErr) {
+                    console.warn('Skipping gallery item for', id, innerErr);
+                }
+            });
+
+            if (!anyAdded) {
+                alert('No valid adjusted crops available to preview.');
+                return;
+            }
+
+            const overlay = document.getElementById('gallery-overlay');
+            if (!overlay) throw new Error('Gallery overlay element not found');
+            overlay.style.display = 'block';
+        } catch (err) {
+            console.error('generateGallery failed', err);
+            alert('Failed to open gallery — see console for details.');
         }
-        
-        modifiedIds.forEach(id => {
-            const data = cropMemory[id];
-            const canvas = getCroppedCanvas(data);
-            const item = document.createElement('div');
-            item.className = 'gallery-item';
-            
-            item.innerHTML = `
-                <img src="${canvas.toDataURL('image/jpeg', 0.5)}">
-                <span style="display:block; margin-bottom:10px; font-weight:bold;">${presetConfig[id].title}</span>
-                <button class="action-btn download-btn" onclick="downloadSingleFromGallery('${id}')">Download JPG</button>
-            `;
-            grid.appendChild(item);
-        });
-        document.getElementById('gallery-overlay').style.display = 'block';
     }
 
     window.downloadSingleFromGallery = (id) => {
@@ -599,13 +634,19 @@
 
     function showCoordinateOverlay() {
         const body = document.getElementById('data-table-body');
-        body.innerHTML = Object.entries(cropMemory).map(([id, d]) => `
+        // show rows only for presets that have crop data
+        const rows = Object.entries(cropMemory).map(([id, d]) => `
             <tr>
-                <td><b>${presetConfig[id].title}</b></td>
+                <td><b>${presetConfig[id]?.title || id}</b></td>
                 <td>${Math.round(d.x)}, ${Math.round(d.y)}</td>
                 <td>${Math.round(d.x + d.width)}, ${Math.round(d.y + d.height)}</td>
                 <td>${Math.round(d.width)} x ${Math.round(d.height)}px</td>
             </tr>`).join('');
+        if (!rows) {
+            alert('No crop data available to show.');
+            return;
+        }
+        body.innerHTML = rows;
         document.getElementById('data-overlay').style.display = 'block';
     }
 
