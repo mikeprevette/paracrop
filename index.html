@@ -139,17 +139,22 @@
 </div>
 
 <script>
-    const presetConfig = {
-        "default": { title: "16:9 cinema", group: "Horizontal", ratio: 16/9, minSize: 500, prefix: "CINEMA-169", overlays: [{ top: 5, left: 5, width: 10, height: 10 }, { top: 80, left: 10, width: 40, height: 5 }] },
-        "appbground_16-9": { title: "16:9 App Main Background", group: "Horizontal", ratio: 16/9, minSize: 800, prefix: "APP-BG", overlays: [{ top: 5, left: 5, width: 10, height: 10 }, { top: 80, left: 10, width: 40, height: 5 }] },
-        "standard_4-3": { title: "4:3 Standard", group: "Horizontal", ratio: 4/3, minSize: 500, prefix: "STD-43", overlays: [] },
-        "photo_3-2": { title: "3:2 Photo", group: "Horizontal", ratio: 3/2, minSize: 500, prefix: "PHOTO-32", overlays: [] },
-        "story_9-16": { title: "9:16 Story", group: "Vertical", ratio: 9/16, minSize: 720, prefix: "STORY-916", overlays: [{ top: 5, left: 5, width: 15, height: 5 }, { top: 85, left: 5, width: 90, height: 10 }] },
-        "social_3-4": { title: "3:4 Portrait", group: "Vertical", ratio: 3/4, minSize: 600, prefix: "PORTRAIT-34", overlays: [{ top: 10, left: 10, width: 80, height: 5 }] },
-        "classic_2-3": { title: "2:3 Classic", group: "Vertical", ratio: 2/3, minSize: 500, prefix: "CLASSIC-23", overlays: [] },
-        "square_1-1": { title: "1:1 Square", group: "Other", ratio: 1/1, minSize: 400, prefix: "SQUARE-11", overlays: [{ top: 45, left: 45, width: 10, height: 10 }] },
-        "free_form": { title: "Free Form", group: "Other", ratio: NaN, minSize: 300, prefix: "CUSTOM", overlays: [] }
-    };
+    let presetConfig = {};
+
+    // Load the presets from an external JSON file (presets.json)
+    fetch('presets.json')
+        .then(r => {
+            if (!r.ok) throw new Error('Network response was not ok');
+            return r.json();
+        })
+        .then(data => {
+            presetConfig = data;
+            buildPresetsUI();
+        })
+        .catch(err => {
+            console.error('Failed to load presets.json', err);
+            alert('Failed to load presets.json — presets unavailable.');
+        });
 
     let cropper, currentId = "default", currentBtn, cropMemory = {}, isSwitching = false, showOverlays = true;
     const imgElement = document.getElementById('image');
@@ -190,7 +195,7 @@
             container.appendChild(list);
         });
     }
-    buildPresetsUI();
+    
 
     function processFile(file) {
         if (!file) return;
@@ -210,7 +215,7 @@
     function initCropper() {
         cropper = new Cropper(imgElement, {
             viewMode: 1,
-            aspectRatio: presetConfig[currentId].ratio,
+            aspectRatio: (function(){ const r = presetConfig[currentId]?.ratio; return (typeof r === 'number' && isFinite(r)) ? r : NaN; })(),
             autoCropArea: 0.8,
             crop(event) {
                 if (isSwitching) return;
@@ -238,8 +243,8 @@
         btn.classList.add('active');
         currentBtn = btn;
         currentId = btn.getAttribute('data-id');
-        
-        cropper.setAspectRatio(ratio);
+        const effectiveRatio = (typeof ratio === 'number' && isFinite(ratio)) ? ratio : NaN;
+        cropper.setAspectRatio(effectiveRatio);
         if (cropMemory[currentId]) {
             cropper.setData(cropMemory[currentId]);
         }
