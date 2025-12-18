@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
     <style>
-        :root { --primary: #007bff; --success: #28a745; --dark: #1a1a1a; --border: #e0e0e0; --bulk: #4afa1a81; --zip: #fd7e14; --info: #17a2b8; --danger: #ff4444; }
+        :root { --primary: #007bff; --success: #28a745; --dark: #1a1a1a; --border: #e0e0e0; --bulk: #9f156e77; --link: #42bc20c6; --zip: #fd7e14; --info: #17a2b8; --danger: #ff4444; }
         body { font-family: 'Inter', -apple-system, sans-serif; padding: 20px; background: #f4f7f9; color: #333; margin: 0; min-height: 100vh; }
         
         .container { max-width: 1200px; margin: 20px auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); position: relative; z-index: 1; }
@@ -42,12 +42,12 @@
         .preset-controls { display: inline-flex; align-items: center; gap: 8px; }
         .reset-btn, .link-toggle { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; border-radius: 6px; border: 1px solid #e6e6e6; background: #fff; color: #333; cursor: pointer; padding: 0; transition: all 0.12s ease; }
         .reset-btn:hover, .link-toggle:hover { background: #f6f7f8; transform: translateY(-1px); }
-        .link-toggle.active { background: var(--bulk); color: #fff; border-color: rgba(0,0,0,0.06); box-shadow: 0 6px 18px rgba(111,66,193,0.12); }
+        .link-toggle.active { background: var(--link); color: #fff; border-color: rgba(0,0,0,0.06); box-shadow: 0 6px 18px rgba(111,66,193,0.12); }
         .crop-btn.linked { box-shadow: 0 0 0 2px rgba(111,66,193,0.06) inset; }
 
         .status-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #ddd; background: transparent; flex-shrink: 0; }
         .is-modified .status-dot { background: var(--success); border-color: var(--success); }
-        .active .status-dot { border-color: var(--success); background: var(--success); }
+        .active .status-dot { border-color: white; background: white; }
 
         .editor-col { display: flex; flex-direction: column; align-items: flex-start; }
         .img-container { max-height: 70vh; width: 100%; background-color: var(--dark); border-radius: 8px; overflow: hidden; display: none; }
@@ -189,13 +189,14 @@
     // Link state for presets: when true the preset is part of the moving-center group
     const linkedState = {};
     const lastCenters = {};
+    const adjustedState = {};
 
     // Persisted state keys
     const STORAGE_KEY = 'paracrop_state_v1';
 
     function saveStateToStorage() {
         try {
-            const payload = { linkedState, cropMemory };
+            const payload = { linkedState, cropMemory, adjustedState };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
         } catch (e) {
             console.warn('Failed to save Paracrop state', e);
@@ -209,6 +210,7 @@
             const parsed = JSON.parse(raw);
             if (parsed.linkedState) Object.assign(linkedState, parsed.linkedState);
             if (parsed.cropMemory) Object.assign(cropMemory, parsed.cropMemory);
+            if (parsed.adjustedState) Object.assign(adjustedState, parsed.adjustedState);
         } catch (e) {
             console.warn('Failed to load Paracrop state', e);
         }
@@ -294,7 +296,7 @@
                         lastCenters[cfg.id] = { x: d.x + d.width/2, y: d.y + d.height/2 };
                     }
                 }
-                if (cropMemory[cfg.id]) {
+                if (adjustedState[cfg.id]) {
                     btn.classList.add('is-modified');
                 }
 
@@ -314,7 +316,12 @@
             document.getElementById('canvas-wrapper').style.display = 'block';
             if (cropper) cropper.destroy();
             cropMemory = {};
+            // clear adjusted flags and last centers so previous image adjustments do not carry over
+            Object.keys(adjustedState).forEach(k => delete adjustedState[k]);
+            Object.keys(lastCenters).forEach(k => delete lastCenters[k]);
             document.querySelectorAll('.crop-btn').forEach(b => b.classList.remove('is-modified'));
+            // persist cleared adjustedState
+            saveStateToStorage();
             ['downloadBtn', 'bulkBtn', 'dataBtn'].forEach(id => document.getElementById(id).disabled = false);
             initCropper();
         };
@@ -341,9 +348,18 @@
                 // compute new center
                 const newCenter = { x: d.x + d.width/2, y: d.y + d.height/2 };
 
+                // determine if this is the first adjustment for this preset
+                const firstAdjust = !cropMemory[currentId];
+
                 // store the data for this preset
                 cropMemory[currentId] = { ...d };
-                if (currentBtn) currentBtn.classList.add('is-modified');
+                if (currentBtn) {
+                    currentBtn.classList.add('is-modified');
+                }
+
+                // mark as adjusted (this distinguishes a reposition from default/cleared state)
+                adjustedState[currentId] = true;
+                saveStateToStorage();
 
                 // If this preset had a previous center, apply delta to linked presets
                 const prev = lastCenters[currentId];
@@ -428,6 +444,8 @@
         parentBtn.classList.remove('is-modified');
 
         // persist removal
+        // clear adjusted state
+        delete adjustedState[id];
         saveStateToStorage();
 
         // If the preset is currently selected, reset the cropper view to initial state
@@ -482,6 +500,8 @@
             const btn = document.querySelector(`.crop-btn[data-id="${id}"]`);
             if (btn) btn.classList.add('is-modified');
             lastCenters[id] = { x: newX + d.width/2, y: newY + d.height/2 };
+            // linked move counts as an adjustment
+            adjustedState[id] = true;
         });
         // persist linked crop changes all at once
         saveStateToStorage();
