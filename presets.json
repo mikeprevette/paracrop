@@ -1,5 +1,5 @@
 {
-  "default": { "title": "16:9 Default", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 500, "prefix": "CINEMA-169", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
+  "default": { "title": "16:9 Default", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 500, "prefix": "default-169", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
   "marquee_16-9": { "title": "16:9 Marquee", "group": "Horizontal", "ratio": 1.7777777777777777, "minSize": 800, "prefix": "APP-BG", "overlays": [{ "top": 5, "left": 5, "width": 10, "height": 10 }, { "top": 80, "left": 10, "width": 40, "height": 5 }] },
   "standard_4-3": { "title": "4:3 Standard", "group": "Horizontal", "ratio": 1.3333333333333333, "minSize": 500, "prefix": "STD-43", "overlays": [] },
   "photo_3-2": { "title": "3:2 Photo", "group": "Horizontal", "ratio": 1.5, "minSize": 500, "prefix": "PHOTO-32", "overlays": [] },

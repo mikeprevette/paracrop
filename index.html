@@ -38,6 +38,9 @@
         .crop-btn { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 0.9rem; transition: 0.2s; text-align: left; width: 100%; box-sizing: border-box; }
         .crop-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
         .status-dot { width: 8px; height: 8px; background: transparent; border-radius: 50%; border: 1px solid #ddd; flex-shrink: 0; }
+        .link-toggle { background: transparent; border: none; cursor: pointer; font-size: 12px; margin-left: 8px; margin-right: 8px; padding: 4px; border-radius: 6px; }
+        .link-toggle.active { color: var(--bulk); background: rgba(55, 232, 52, 0.5); }
+        .crop-btn.linked { box-shadow: 0 0 0 2px rgba(68, 218, 83, 0.16) inset; }
         .is-modified .status-dot { background: var(--success); border-color: var(--success); }
         .active .status-dot { border-color: white; background: white; }
 
@@ -159,7 +162,11 @@
     let cropper, currentId = "default", currentBtn, cropMemory = {}, isSwitching = false, showOverlays = true;
     const imgElement = document.getElementById('image');
 
-    // UI Initializer - Corrected append logic to keep event listeners alive
+    // Link state for presets: when true the preset is part of the moving-center group
+    const linkedState = {};
+    const lastCenters = {};
+
+    // UI Initializer - renders presets and a link-toggle control per preset
     function buildPresetsUI() {
         const container = document.getElementById('dynamic-presets');
         container.innerHTML = '';
@@ -183,11 +190,39 @@
                 const btn = document.createElement('button');
                 btn.className = `crop-btn ${cfg.id === currentId ? 'active' : ''}`;
                 btn.setAttribute('data-id', cfg.id);
-                btn.innerHTML = `<span>${cfg.title}</span> <span class="status-dot"></span>`;
-                
+
+                const leftSpan = document.createElement('span');
+                leftSpan.innerText = cfg.title;
+
+                const rightControls = document.createElement('span');
+                rightControls.style.display = 'inline-flex';
+                rightControls.style.alignItems = 'center';
+
+                const linkBtn = document.createElement('button');
+                linkBtn.type = 'button';
+                linkBtn.className = 'link-toggle';
+                linkBtn.title = 'Link center for group move';
+                linkBtn.innerText = '🔗';
+
+                const statusDot = document.createElement('span');
+                statusDot.className = 'status-dot';
+
+                // Clicking the preset selects it
                 btn.addEventListener('click', () => {
                     handlePresetChange(cfg.ratio, btn);
                 });
+
+                // Toggle linking without selecting the preset
+                linkBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleLink(cfg.id, linkBtn, btn);
+                });
+
+                rightControls.appendChild(linkBtn);
+                rightControls.appendChild(statusDot);
+
+                btn.appendChild(leftSpan);
+                btn.appendChild(rightControls);
 
                 list.appendChild(btn);
                 if (cfg.id === currentId) currentBtn = btn;
@@ -229,8 +264,25 @@
                 // Displaying TL and BR coordinates
                 display.innerHTML = `Size: ${d.width}x${d.height}px | TL: ${d.x},${d.y} | BR: ${d.x+d.width},${d.y+d.height} ${isTooSmall ? ' <b>(TOO SMALL)</b>' : ''}`;
                 
+                // compute new center
+                const newCenter = { x: d.x + d.width/2, y: d.y + d.height/2 };
+
+                // store the data for this preset
                 cropMemory[currentId] = { ...d };
                 if (currentBtn) currentBtn.classList.add('is-modified');
+
+                // If this preset had a previous center, apply delta to linked presets
+                const prev = lastCenters[currentId];
+                if (prev) {
+                    const dx = newCenter.x - prev.x;
+                    const dy = newCenter.y - prev.y;
+                    if ((dx !== 0 || dy !== 0) && Object.values(linkedState).some(v => v)) {
+                        applyCenterDeltaToLinked(dx, dy, currentId);
+                    }
+                }
+
+                // update last center for this preset
+                lastCenters[currentId] = newCenter;
             },
             ready: updateUIOverlay
         });
@@ -247,6 +299,9 @@
         cropper.setAspectRatio(effectiveRatio);
         if (cropMemory[currentId]) {
             cropper.setData(cropMemory[currentId]);
+            // initialize last center for newly-selected preset
+            const d = cropMemory[currentId];
+            lastCenters[currentId] = { x: d.x + d.width/2, y: d.y + d.height/2 };
         }
         
         updateUIOverlay();
@@ -270,6 +325,58 @@
                 height: o.height + '%' 
             });
             viewBox.appendChild(div);
+        });
+    }
+
+    // Toggle link state for a preset
+    function toggleLink(id, linkBtn, parentBtn) {
+        linkedState[id] = !linkedState[id];
+        linkBtn.classList.toggle('active', linkedState[id]);
+        parentBtn.classList.toggle('linked', linkedState[id]);
+
+        // initialize last center if this preset already has crop data
+        if (linkedState[id] && cropMemory[id]) {
+            const d = cropMemory[id];
+            lastCenters[id] = { x: d.x + d.width/2, y: d.y + d.height/2 };
+        } else {
+            delete lastCenters[id];
+        }
+    }
+
+    // Apply a center delta to all linked presets (does not change the active cropper view)
+    function applyCenterDeltaToLinked(dx, dy, sourceId) {
+        const imgW = imgElement.naturalWidth || imgElement.width || 1;
+        const imgH = imgElement.naturalHeight || imgElement.height || 1;
+
+        Object.keys(linkedState).forEach(id => {
+            if (!linkedState[id] || id === sourceId) return;
+            let d = cropMemory[id];
+            if (!d) {
+                // create a default based on source dimensions and target ratio
+                const src = cropMemory[sourceId];
+                if (!src) return;
+                let w = src.width;
+                let h = src.height;
+                const r = presetConfig[id]?.ratio;
+                if (typeof r === 'number' && isFinite(r) && r > 0) {
+                    h = Math.round(w / r);
+                }
+                w = Math.min(w, imgW);
+                h = Math.min(h, imgH);
+                d = { width: w, height: h, x: Math.max(0, Math.min(src.x, imgW - w)), y: Math.max(0, Math.min(src.y, imgH - h)) };
+            }
+
+            const cx = d.x + d.width/2 + dx;
+            const cy = d.y + d.height/2 + dy;
+            let newX = cx - d.width/2;
+            let newY = cy - d.height/2;
+            newX = Math.max(0, Math.min(newX, imgW - d.width));
+            newY = Math.max(0, Math.min(newY, imgH - d.height));
+
+            cropMemory[id] = { ...d, x: newX, y: newY };
+            const btn = document.querySelector(`.crop-btn[data-id="${id}"]`);
+            if (btn) btn.classList.add('is-modified');
+            lastCenters[id] = { x: newX + d.width/2, y: newY + d.height/2 };
         });
     }
 
