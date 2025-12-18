@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ParaCrop - Professional Batch Cropping</title>
+    <title>ParaCrop</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -73,6 +73,8 @@
         .bulk-btn { background: var(--bulk); }
         .data-btn { background: var(--info); }
         .action-btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
+        .reset-view-btn { margin-top: 14px; padding: 8px 12px; border-radius: 8px; font-weight: 700; background: #f1f3f5; color: #222; border: 1px solid #e6e6e6; cursor: pointer; }
+        .reset-view-btn:hover { background: #eef1f4; }
 
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(18, 18, 18, 0.98); z-index: 9999; overflow-y: auto; }
         .modal-content { max-width: 1100px; margin: 40px auto; padding: 0 20px; color: white; }
@@ -142,6 +144,7 @@
         <div class="editor-col">
             <div id="dim-display">Waiting for image upload...</div>
             <div class="img-container" id="canvas-wrapper"><img id="image"></div>
+            <button id="resetViewBtn" class="reset-view-btn" onclick="resetImageView()" disabled style="display:none">Reset Image Position & Zoom</button>
         </div>
     </div>
 </div>
@@ -322,8 +325,10 @@
             document.querySelectorAll('.crop-btn').forEach(b => b.classList.remove('is-modified'));
             // persist cleared adjustedState
             saveStateToStorage();
-            ['downloadBtn', 'bulkBtn', 'dataBtn'].forEach(id => document.getElementById(id).disabled = false);
-            initCropper();
+                ['downloadBtn', 'bulkBtn', 'dataBtn', 'resetViewBtn'].forEach(id => document.getElementById(id).disabled = false);
+                // show the reset view button once an image has been loaded
+                const rv = document.getElementById('resetViewBtn'); if (rv) rv.style.display = 'inline-block';
+                initCropper();
         };
         reader.readAsDataURL(file);
     }
@@ -464,6 +469,26 @@
         } else {
             updateUIOverlay();
         }
+    }
+
+    // Reset image position & zoom (preserves crop data if present)
+    function resetImageView() {
+        if (!cropper) return;
+        isSwitching = true;
+        try {
+            cropper.reset();
+        } catch (e) {
+            try { cropper.destroy(); } catch (err) {}
+            initCropper();
+        }
+
+        // if there's stored crop data for the current preset, reapply it
+        if (cropMemory[currentId]) {
+            try { cropper.setData(cropMemory[currentId]); } catch (e) {}
+        }
+
+        updateUIOverlay();
+        setTimeout(() => { isSwitching = false; }, 120);
     }
 
     // Apply a center delta to all linked presets (does not change the active cropper view)
