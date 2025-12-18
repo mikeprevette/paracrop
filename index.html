@@ -38,11 +38,13 @@
         .crop-btn { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 0.9rem; transition: 0.2s; text-align: left; width: 100%; box-sizing: border-box; }
         .crop-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
         .status-dot { width: 8px; height: 8px; background: transparent; border-radius: 50%; border: 1px solid #ddd; flex-shrink: 0; }
-        .link-toggle { background: transparent; border: none; cursor: pointer; font-size: 12px; margin-left: 8px; margin-right: 8px; padding: 4px; border-radius: 6px; }
+        .link-toggle { background: transparent; border: none; cursor: pointer; font-size: 12px; margin-right: 8px; padding: 4px; border-radius: 6px; }
         .link-toggle.active { color: var(--bulk); background: rgba(55, 232, 52, 0.5); }
         .crop-btn.linked { box-shadow: 0 0 0 2px rgba(68, 218, 83, 0.16) inset; }
+            .reset-btn { background: transparent; border: none; cursor: pointer; font-size: 14px; margin-right: 8px; padding: 4px; border-radius: 6px; }
+            .reset-btn:hover { background: rgba(0,0,0,0.04); }
         .is-modified .status-dot { background: var(--success); border-color: var(--success); }
-        .active .status-dot { border-color: white; background: white; }
+        .active .status-dot { border-color: var(--success); background: var(--success); }
 
         .editor-col { display: flex; flex-direction: column; align-items: flex-start; }
         .img-container { max-height: 70vh; width: 100%; background-color: var(--dark); border-radius: 8px; overflow: hidden; display: none; }
@@ -152,7 +154,26 @@
         })
         .then(data => {
             presetConfig = data;
+            // load persisted state first so UI reflects saved link/reset
+            loadStateFromStorage();
             buildPresetsUI();
+
+            // reflect persisted modified/linked state in the UI
+            Object.keys(cropMemory).forEach(id => {
+                const btn = document.querySelector(`.crop-btn[data-id="${id}"]`);
+                if (btn) btn.classList.add('is-modified');
+            });
+            Object.keys(linkedState).forEach(id => {
+                if (!linkedState[id]) return;
+                const btn = document.querySelector(`.crop-btn[data-id="${id}"]`);
+                const linkBtn = btn && btn.querySelector('.link-toggle');
+                if (btn) btn.classList.add('linked');
+                if (linkBtn) linkBtn.classList.add('active');
+                if (cropMemory[id]) {
+                    const d = cropMemory[id];
+                    lastCenters[id] = { x: d.x + d.width/2, y: d.y + d.height/2 };
+                }
+            });
         })
         .catch(err => {
             console.error('Failed to load presets.json', err);
@@ -165,6 +186,30 @@
     // Link state for presets: when true the preset is part of the moving-center group
     const linkedState = {};
     const lastCenters = {};
+
+    // Persisted state keys
+    const STORAGE_KEY = 'paracrop_state_v1';
+
+    function saveStateToStorage() {
+        try {
+            const payload = { linkedState, cropMemory };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        } catch (e) {
+            console.warn('Failed to save Paracrop state', e);
+        }
+    }
+
+    function loadStateFromStorage() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            if (parsed.linkedState) Object.assign(linkedState, parsed.linkedState);
+            if (parsed.cropMemory) Object.assign(cropMemory, parsed.cropMemory);
+        } catch (e) {
+            console.warn('Failed to load Paracrop state', e);
+        }
+    }
 
     // UI Initializer - renders presets and a link-toggle control per preset
     function buildPresetsUI() {
@@ -198,6 +243,12 @@
                 rightControls.style.display = 'inline-flex';
                 rightControls.style.alignItems = 'center';
 
+                const resetBtn = document.createElement('button');
+                resetBtn.type = 'button';
+                resetBtn.className = 'reset-btn';
+                resetBtn.title = 'Reset this preset crop';
+                resetBtn.innerText = '↺';
+
                 const linkBtn = document.createElement('button');
                 linkBtn.type = 'button';
                 linkBtn.className = 'link-toggle';
@@ -212,17 +263,37 @@
                     handlePresetChange(cfg.ratio, btn);
                 });
 
+                // Reset without selecting the preset
+                resetBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    resetPresetCrop(cfg.id, resetBtn, btn);
+                });
+
                 // Toggle linking without selecting the preset
                 linkBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     toggleLink(cfg.id, linkBtn, btn);
                 });
 
+                rightControls.appendChild(resetBtn);
                 rightControls.appendChild(linkBtn);
                 rightControls.appendChild(statusDot);
 
                 btn.appendChild(leftSpan);
                 btn.appendChild(rightControls);
+
+                // reflect persisted states
+                if (linkedState[cfg.id]) {
+                    linkBtn.classList.add('active');
+                    btn.classList.add('linked');
+                    if (cropMemory[cfg.id]) {
+                        const d = cropMemory[cfg.id];
+                        lastCenters[cfg.id] = { x: d.x + d.width/2, y: d.y + d.height/2 };
+                    }
+                }
+                if (cropMemory[cfg.id]) {
+                    btn.classList.add('is-modified');
+                }
 
                 list.appendChild(btn);
                 if (cfg.id === currentId) currentBtn = btn;
@@ -283,6 +354,9 @@
 
                 // update last center for this preset
                 lastCenters[currentId] = newCenter;
+
+                // persist crop changes
+                saveStateToStorage();
             },
             ready: updateUIOverlay
         });
@@ -341,6 +415,34 @@
         } else {
             delete lastCenters[id];
         }
+        saveStateToStorage();
+    }
+
+    // Reset a preset's stored crop data and (if active) reset the cropper view
+    function resetPresetCrop(id, resetBtn, parentBtn) {
+        delete cropMemory[id];
+        delete lastCenters[id];
+        parentBtn.classList.remove('is-modified');
+
+        // persist removal
+        saveStateToStorage();
+
+        // If the preset is currently selected, reset the cropper view to initial state
+        if (id === currentId && cropper) {
+            isSwitching = true;
+            try {
+                cropper.reset();
+            } catch (e) {
+                try { cropper.destroy(); } catch (err) {}
+                initCropper();
+            }
+            const r = presetConfig[currentId]?.ratio;
+            try { cropper.setAspectRatio((typeof r === 'number' && isFinite(r)) ? r : NaN); } catch (e) {}
+            updateUIOverlay();
+            setTimeout(() => { isSwitching = false; }, 120);
+        } else {
+            updateUIOverlay();
+        }
     }
 
     // Apply a center delta to all linked presets (does not change the active cropper view)
@@ -378,6 +480,8 @@
             if (btn) btn.classList.add('is-modified');
             lastCenters[id] = { x: newX + d.width/2, y: newY + d.height/2 };
         });
+        // persist linked crop changes all at once
+        saveStateToStorage();
     }
 
     // Helper: Returns a Canvas based on stored crop data
