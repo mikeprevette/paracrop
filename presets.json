@@ -6,5 +6,6 @@
 "hero_portrait": { "title": "Hero Portrait", "group": "Horizontal", "ratio": 1.0995, "minSize": 3638, "prefix": "hero_portrait", "overlays": [] },
 "2-3_Poster": { "title": "2:3 Poster", "group": "Vertical", "ratio": 0.6666666666666666, "minSize": 1400, "prefix": "2x3_poster", "overlays": [] },
 "2-3_Feature": { "title": "2:3 Featured", "group": "Vertical", "ratio": 0.6666666666666666, "minSize": 1400, "prefix": "2x3_feature", "overlays": [] },
-"hero_compact": { "title": "Hero Compact", "group": "Vertical", "ratio": 0.462, "minSize": 1242, "prefix": "hero_compact", "overlays": [] }
+"hero_compact": { "title": "Hero Compact", "group": "Vertical", "ratio": 0.462, "minSize": 1242, "prefix": "hero_compact", "overlays": [] },
+"free": { "title": "Free Crop", "group": "Custom", "ratio": null, "minSize": 0, "prefix": "custom", "overlays": [] }
 }
