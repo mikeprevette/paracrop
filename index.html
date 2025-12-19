@@ -77,6 +77,26 @@
         .action-btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
         .reset-view-btn { margin-top: 14px; padding: 8px 12px; border-radius: 8px; font-weight: 700; background: #f1f3f5; color: #222; border: 1px solid #e6e6e6; cursor: pointer; }
         .reset-view-btn:hover { background: #eef1f4; }
+        .export-config { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+        .export-config label { font-size: 0.7rem; color: #666; margin-right: 6px; }
+        .export-config select {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: white;
+            /* font-weight: 600; */
+            font-family: Inter, -apple-system, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            font-size: 0.7rem;
+            color: #222;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            cursor: pointer;
+            min-width: 120px;
+        }
+        /* small caret alignment for selects */
+        .export-config select::-ms-expand { display: none; }
 
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(18, 18, 18, 0.98); z-index: 9999; overflow-y: auto; }
         .modal-content { max-width: 1100px; margin: 40px auto; padding: 0 20px; color: white; }
@@ -136,17 +156,42 @@
             <div class="group-label">Tools</div>
             <button class="crop-btn" style="width:100%" onclick="toggleOverlays()"><span id="toggle-text">Hide UI Guides</span></button>
 
-            <div class="btn-stack">
-                <button class="action-btn download-btn" id="downloadBtn" onclick="performCrop()" disabled>Download Current</button>
-                <button class="action-btn bulk-btn" id="bulkBtn" onclick="generateGallery()" disabled>Review All Adjusted</button>
-                <button class="action-btn data-btn" id="dataBtn" onclick="showCoordinateOverlay()" disabled>View Crop Data Points</button>
-            </div>
+            
+
+            <!-- export panel moved into editor column -->
         </div>
 
         <div class="editor-col">
             <div id="dim-display">Waiting for image upload...</div>
             <div class="img-container" id="canvas-wrapper"><img id="image"></div>
             <button id="resetViewBtn" class="reset-view-btn" onclick="resetImageView()" disabled style="display:none">Reset Image Position & Zoom</button>
+            <!-- editor controls moved here from sidebar -->
+            <div style="width:100%; margin-top:18px;">
+                <div class="btn-stack" style="flex-direction: row; gap: 10px;">
+                    <button class="action-btn download-btn" id="downloadBtn" onclick="performCrop()" disabled style="flex:1;">Download Current</button>
+                    <button class="action-btn bulk-btn" id="bulkBtn" onclick="generateGallery()" disabled style="flex:1;">Review All Adjusted</button>
+                    <button class="action-btn data-btn" id="dataBtn" onclick="showCoordinateOverlay()" disabled style="flex:1;">View Crop Data Points</button>
+                </div>
+
+                <div id="export-controls-wrapper" style="margin-top:12px; display:flex; justify-content:flex-start;">
+                    <div class="export-config" id="export-config" style="display:none; flex-direction:row; gap:12px; align-items:center;">
+                        <label for="templateSelect" style="font-size:0.8rem; color:#666; margin-right:4px;">Template</label>
+                        <select id="templateSelect" style="min-width:120px;">
+                            <option value="">—</option>
+                        </select>
+
+                        <label for="countrySelect" style="font-size:0.8rem; color:#666; margin-left:6px; margin-right:4px;">Country</label>
+                        <select id="countrySelect" style="min-width:90px;">
+                            <option value="">—</option>
+                        </select>
+
+                        <div style="display:flex; align-items:center; gap:8px; margin-left:8px;">
+                            <strong style="font-size:0.78rem; color:#666">Example:</strong>
+                            <div id="exampleFilename" style="font-family: monospace; background:#f6f7f8; color:#222; padding:6px 10px; border-radius:6px; border:1px solid #e6e6e6;">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -165,6 +210,43 @@
             // load persisted state first so UI reflects saved link/reset
             loadStateFromStorage();
             buildPresetsUI();
+
+            // populate export dropdowns from presets.json meta (templates & countries)
+            try {
+                const meta = presetConfig.__meta__ || presetConfig.meta || {};
+                const templates = Array.isArray(meta.templates) ? meta.templates : [];
+                const countries = Array.isArray(meta.countries) ? meta.countries : [];
+                const tplSelect = document.getElementById('templateSelect');
+                if (tplSelect) {
+                    tplSelect.innerHTML = '<option value="">—</option>';
+                    templates.forEach(t => { const o = document.createElement('option'); o.value = t; o.text = t; tplSelect.appendChild(o); });
+                }
+                const countrySelect = document.getElementById('countrySelect');
+                if (countrySelect) {
+                    countrySelect.innerHTML = '<option value="">—</option>';
+                    countries.forEach(c => { const o = document.createElement('option'); o.value = c; o.text = c; countrySelect.appendChild(o); });
+                }
+
+                // wire live-updating example filename
+                function updateExampleFilename() {
+                    const el = document.getElementById('exampleFilename');
+                    if (!el) return;
+                    // ensure currentId is used for preset portion
+                    const name = buildExportFilename(currentId || '');
+                    el.textContent = name;
+                }
+
+                const tplEl = document.getElementById('templateSelect');
+                const countryEl = document.getElementById('countrySelect');
+                if (tplEl) tplEl.addEventListener('change', updateExampleFilename);
+                if (countryEl) countryEl.addEventListener('change', updateExampleFilename);
+
+                // Expose updater for other parts of the app
+                window.updateExampleFilename = updateExampleFilename;
+
+                // initialize the example filename
+                setTimeout(() => { try { updateExampleFilename(); } catch (e) {} }, 60);
+            } catch (e) { console.warn('Failed to populate export selects from presets.json', e); }
 
             // reflect persisted modified/linked state in the UI
             Object.keys(cropMemory).forEach(id => {
@@ -190,6 +272,8 @@
 
     let cropper, currentId = "default", currentBtn, cropMemory = {}, isSwitching = false, showOverlays = true;
     const imgElement = document.getElementById('image');
+    let currentOriginalFilename = '';
+    let currentOriginalBasename = '';
 
     // Link state for presets: when true the preset is part of the moving-center group
     const linkedState = {};
@@ -239,6 +323,9 @@
         const groups = {};
         
         Object.entries(presetConfig).forEach(([id, cfg]) => {
+            // skip meta entries or invalid preset entries
+            if (!id || id.startsWith('__')) return;
+            if (!cfg || typeof cfg !== 'object' || !cfg.group) return;
             if (!groups[cfg.group]) groups[cfg.group] = [];
             groups[cfg.group].push({ id, ...cfg });
         });
@@ -338,10 +425,21 @@
             document.querySelectorAll('.crop-btn').forEach(b => b.classList.remove('is-modified'));
             // persist cleared adjustedState
             saveStateToStorage();
-                ['downloadBtn', 'bulkBtn', 'dataBtn', 'resetViewBtn'].forEach(id => document.getElementById(id).disabled = false);
-                // show the reset view button once an image has been loaded
-                const rv = document.getElementById('resetViewBtn'); if (rv) rv.style.display = 'inline-block';
-                initCropper();
+            ['downloadBtn', 'bulkBtn', 'dataBtn', 'resetViewBtn'].forEach(id => document.getElementById(id).disabled = false);
+            // show the reset view button once an image has been loaded
+            const rv = document.getElementById('resetViewBtn'); if (rv) rv.style.display = 'inline-block';
+            // show export config controls
+            const ec = document.getElementById('export-config'); if (ec) ec.style.display = 'flex';
+
+            // store original file name info for exports
+            try {
+                currentOriginalFilename = file.name || '';
+                // remove extension for basename
+                const idx = currentOriginalFilename.lastIndexOf('.');
+                currentOriginalBasename = idx > 0 ? currentOriginalFilename.substring(0, idx) : currentOriginalFilename;
+            } catch (e) { currentOriginalFilename = currentOriginalBasename = ''; }
+
+            initCropper();
         };
         reader.readAsDataURL(file);
     }
@@ -417,6 +515,7 @@
         }
         
         updateUIOverlay();
+        try { if (typeof window.updateExampleFilename === 'function') window.updateExampleFilename(); } catch(e){}
         setTimeout(() => { isSwitching = false; }, 150);
     }
 
@@ -558,10 +657,10 @@
 
     function performCrop() {
         if (!cropper || !cropMemory[currentId]) return;
-        const prefix = presetConfig[currentId].prefix || currentId;
+        const filename = buildExportFilename(currentId);
         const canvas = getCroppedCanvas(cropMemory[currentId]);
         canvas.toBlob(blob => {
-            saveAs(blob, `${prefix}.jpg`);
+            saveAs(blob, filename);
         }, 'image/jpeg', 0.95);
     }
 
@@ -587,10 +686,12 @@
                     const canvas = getCroppedCanvas(data);
                     const item = document.createElement('div');
                     item.className = 'gallery-item';
+                    const filename = buildExportFilename(id);
 
                     item.innerHTML = `
                         <img src="${canvas.toDataURL('image/jpeg', 0.5)}">
-                        <span style="display:block; margin-bottom:10px; font-weight:bold;">${presetConfig[id]?.title || id}</span>
+                        <span style="display:block; margin-bottom:6px; font-weight:bold;">${presetConfig[id]?.title || id}</span>
+                        <div style="font-family: monospace; font-size:0.85rem; color:#ddd; margin-bottom:8px; word-break:break-all;">${filename}</div>
                         <button class="action-btn download-btn" onclick="downloadSingleFromGallery('${id}')">Download JPG</button>
                     `;
                     grid.appendChild(item);
@@ -615,23 +716,47 @@
     }
 
     window.downloadSingleFromGallery = (id) => {
-        const prefix = presetConfig[id].prefix || id;
+        const filename = buildExportFilename(id);
         const canvas = getCroppedCanvas(cropMemory[id]);
-        canvas.toBlob(blob => saveAs(blob, `${prefix}.jpg`), 'image/jpeg', 0.95);
+        canvas.toBlob(blob => saveAs(blob, filename), 'image/jpeg', 0.95);
     };
 
     async function downloadAllAsZip() {
         const zip = new JSZip();
         const modifiedIds = Object.keys(cropMemory);
-        
+
         for (const id of modifiedIds) {
             const canvas = getCroppedCanvas(cropMemory[id]);
             const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));
-            zip.file(`${presetConfig[id].prefix || id}.jpg`, blob);
+            const filename = buildExportFilename(id);
+            zip.file(filename, blob);
         }
         
         const content = await zip.generateAsync({type:"blob"});
         saveAs(content, "ParaCrop-Batch.zip");
+    }
+
+    // Helper: sanitize token for filename components
+    function sanitizeToken(s) {
+        if (!s) return '';
+        return String(s).trim().replace(/\s+/g, '-').replace(/[^A-Za-z0-9\-_]/g, '');
+    }
+
+    // Build export filename for a given preset id using selected Template, Country, Year, preset prefix, and original filename base
+    function buildExportFilename(presetId) {
+        const tpl = document.getElementById('templateSelect')?.value || '';
+        const country = document.getElementById('countrySelect')?.value || '';
+        const year = (new Date()).getFullYear();
+        const presetPrefix = presetConfig[presetId]?.prefix || presetId;
+        const parts = [];
+        if (tpl) parts.push(sanitizeToken(tpl));
+        if (country) parts.push(sanitizeToken(country));
+        parts.push(String(year));
+        parts.push(sanitizeToken(presetPrefix));
+        const base = sanitizeToken(currentOriginalBasename) || 'image';
+        parts.push(base);
+        // join with underscore and ensure .jpg extension
+        return parts.join('_') + '.jpg';
     }
 
     function showCoordinateOverlay() {
