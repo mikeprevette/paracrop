@@ -186,7 +186,7 @@
                         </select>
 
                         <div style="display:flex; align-items:center; gap:8px; margin-left:8px;">
-                            <strong style="font-size:0.78rem; color:#666">Example:</strong>
+                            <label style="font-size:0.8rem; color:#666; margin-left:6px; margin-right:4px;">Example:</label>
                             <div id="exampleFilename" style="font-family: monospace; background:#f6f7f8; color:#222; padding:6px 10px; border-radius:6px; border:1px solid #e6e6e6;">—</div>
                         </div>
                     </div>
@@ -733,7 +733,15 @@
         }
         
         const content = await zip.generateAsync({type:"blob"});
-        saveAs(content, "ParaCrop-Batch.zip");
+        // Build zip filename as <originalBase>_imageset_MMDDYYYY.zip
+        const now = new Date();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const yyyy = String(now.getFullYear());
+        const dateToken = `${mm}${dd}${yyyy}`;
+        const base = sanitizeToken(currentOriginalBasename) || 'image';
+        const zipName = `${base}_imageset_${dateToken}.zip`;
+        saveAs(content, zipName);
     }
 
     // Helper: sanitize token for filename components
