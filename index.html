@@ -98,6 +98,10 @@
         /* small caret alignment for selects */
         .export-config select::-ms-expand { display: none; }
 
+        .size-badge { font-size: 0.7rem; color: #666; background: #f6f7f8; padding: 3px 6px; border-radius:6px; border:1px solid #e6e6e6; margin-left:6px; }
+        .scale-toggle { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; border-radius: 6px; border: 1px solid #e6e6e6; background: #fff; color: #333; cursor: pointer; padding: 0; }
+        .scale-toggle.active { background: #ffd86b; border-color: #ffcc33; color: #222; }
+
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(18, 18, 18, 0.98); z-index: 9999; overflow-y: auto; }
         .modal-content { max-width: 1100px; margin: 40px auto; padding: 0 20px; color: white; }
         .modal-header { position: sticky; top: 0; background: #121212; padding: 20px 0; display: flex; justify-content: space-between; align-items: center; z-index: 10; border-bottom: 1px solid #333; gap: 15px; }
@@ -291,6 +295,7 @@
 
     let cropper, currentId = "default", currentBtn, cropMemory = {}, isSwitching = false, showOverlays = true;
     const imgElement = document.getElementById('image');
+    const exportScaleEnabled = {};
     let currentOriginalFilename = '';
     let currentOriginalBasename = '';
 
@@ -315,7 +320,7 @@
 
     function saveStateToStorage() {
         try {
-            const payload = { linkedState, cropMemory, adjustedState };
+            const payload = { linkedState, cropMemory, adjustedState, exportScaleEnabled };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
         } catch (e) {
             console.warn('Failed to save Paracrop state', e);
@@ -330,6 +335,7 @@
             if (parsed.linkedState) Object.assign(linkedState, parsed.linkedState);
             if (parsed.cropMemory) Object.assign(cropMemory, parsed.cropMemory);
             if (parsed.adjustedState) Object.assign(adjustedState, parsed.adjustedState);
+            if (parsed.exportScaleEnabled) Object.assign(exportScaleEnabled, parsed.exportScaleEnabled);
         } catch (e) {
             console.warn('Failed to load Paracrop state', e);
         }
@@ -382,6 +388,22 @@
                 linkBtn.title = 'Link center for group move';
                 linkBtn.innerText = '🔗';
 
+                // Export scale toggle (per-preset)
+                const scaleBtn = document.createElement('button');
+                scaleBtn.type = 'button';
+                scaleBtn.className = 'link-toggle scale-toggle';
+                scaleBtn.title = 'Toggle scaled export for this preset';
+                scaleBtn.innerText = 'S';
+
+                // If preset has exportSize, show a small badge of target size
+                const sizeBadge = document.createElement('span');
+                sizeBadge.className = 'size-badge';
+                if (cfg.exportSize && cfg.exportSize.width && cfg.exportSize.height) {
+                    sizeBadge.innerText = `${cfg.exportSize.width}x${cfg.exportSize.height}`;
+                } else {
+                    sizeBadge.style.display = 'none';
+                }
+
                 const statusDot = document.createElement('span');
                 statusDot.className = 'status-dot';
 
@@ -404,7 +426,9 @@
 
                 rightControls.appendChild(resetBtn);
                 rightControls.appendChild(linkBtn);
+                rightControls.appendChild(scaleBtn);
                 rightControls.appendChild(statusDot);
+                rightControls.appendChild(sizeBadge);
 
                 btn.appendChild(leftSpan);
                 btn.appendChild(rightControls);
@@ -421,6 +445,20 @@
                 if (adjustedState[cfg.id]) {
                     btn.classList.add('is-modified');
                 }
+                // export scale persisted or default
+                const scaleDefault = (cfg.exportSize && cfg.exportSize.width && cfg.exportSize.height) ? true : false;
+                const enabled = (exportScaleEnabled.hasOwnProperty(cfg.id)) ? !!exportScaleEnabled[cfg.id] : scaleDefault;
+                scaleBtn.classList.toggle('active', enabled);
+                if (enabled) exportScaleEnabled[cfg.id] = true;
+
+                // Wire scale toggle click
+                scaleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const cur = !!exportScaleEnabled[cfg.id];
+                    exportScaleEnabled[cfg.id] = !cur;
+                    scaleBtn.classList.toggle('active', !cur);
+                    saveStateToStorage();
+                });
 
                 list.appendChild(btn);
                 if (cfg.id === currentId) currentBtn = btn;
@@ -686,10 +724,52 @@
         return canvas;
     }
 
+    /**
+     * Returns a canvas for the cropped data scaled to the preset's exportSize when available.
+     * - If the preset has no exportSize, returns the original cropped canvas.
+     * - Honors `allowUpscale` (if false, will not enlarge beyond the source crop size).
+     */
+    function getCroppedCanvasScaled(data, presetId) {
+        const srcCanvas = getCroppedCanvas(data);
+        try {
+            // honor per-preset toggle: if user has disabled scaled export for this preset, return source canvas
+            if (exportScaleEnabled.hasOwnProperty(presetId) && !exportScaleEnabled[presetId]) return srcCanvas;
+            const preset = presetConfig[presetId] || {};
+            const exp = preset.exportSize;
+            if (!exp || !exp.width || !exp.height) return srcCanvas;
+
+            let targetW = Number(exp.width) || srcCanvas.width;
+            let targetH = Number(exp.height) || srcCanvas.height;
+
+            // If upscaling is not allowed, clamp the target size down proportionally
+            const allowUpscale = !!exp.allowUpscale;
+            if (!allowUpscale) {
+                const scale = Math.min(1, srcCanvas.width / targetW, srcCanvas.height / targetH);
+                targetW = Math.max(1, Math.round(targetW * scale));
+                targetH = Math.max(1, Math.round(targetH * scale));
+            }
+
+            // If target matches source, return source to avoid extra work
+            if (targetW === srcCanvas.width && targetH === srcCanvas.height) return srcCanvas;
+
+            const out = document.createElement('canvas');
+            out.width = targetW;
+            out.height = targetH;
+            const ctx = out.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height, 0, 0, targetW, targetH);
+            return out;
+        } catch (e) {
+            console.warn('getCroppedCanvasScaled failed, falling back to unscaled canvas', e);
+            return srcCanvas;
+        }
+    }
+
     function performCrop() {
         if (!cropper || !cropMemory[currentId]) return;
         const filename = buildExportFilename(currentId);
-        const canvas = getCroppedCanvas(cropMemory[currentId]);
+        const canvas = getCroppedCanvasScaled(cropMemory[currentId], currentId);
         canvas.toBlob(blob => {
             saveAs(blob, filename);
         }, 'image/jpeg', 0.95);
@@ -714,7 +794,7 @@
                 try {
                     const data = cropMemory[id];
                     if (!data) return; // skip entries without stored crop data
-                    const canvas = getCroppedCanvas(data);
+                    const canvas = getCroppedCanvasScaled(data, id);
                     const item = document.createElement('div');
                     item.className = 'gallery-item';
                     const filename = buildExportFilename(id);
@@ -748,7 +828,7 @@
 
     window.downloadSingleFromGallery = (id) => {
         const filename = buildExportFilename(id);
-        const canvas = getCroppedCanvas(cropMemory[id]);
+        const canvas = getCroppedCanvasScaled(cropMemory[id], id);
         canvas.toBlob(blob => saveAs(blob, filename), 'image/jpeg', 0.95);
     };
 
@@ -757,7 +837,7 @@
         const modifiedIds = Object.keys(cropMemory);
 
         for (const id of modifiedIds) {
-            const canvas = getCroppedCanvas(cropMemory[id]);
+            const canvas = getCroppedCanvasScaled(cropMemory[id], id);
             const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));
             const filename = buildExportFilename(id);
             zip.file(filename, blob);
