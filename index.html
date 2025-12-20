@@ -107,42 +107,40 @@
             loadStateFromStorage();
             buildPresetsUI();
 
-            // populate export dropdowns from presets.json meta (templates & countries)
-            try {
-                const meta = presetConfig.__meta__ || presetConfig.meta || {};
-                const templates = Array.isArray(meta.templates) ? meta.templates : [];
-                const countries = Array.isArray(meta.countries) ? meta.countries : [];
-                const tplSelect = document.getElementById('templateSelect');
-                if (tplSelect) {
-                    tplSelect.innerHTML = '<option value="">—</option>';
-                    templates.forEach(t => { const o = document.createElement('option'); o.value = t; o.text = t; tplSelect.appendChild(o); });
+            // Populate export dropdowns from presets.json meta
+            const meta = presetConfig.__meta__ || presetConfig.meta || {};
+            const templates = Array.isArray(meta.templates) ? meta.templates : [];
+            const countries = Array.isArray(meta.countries) ? meta.countries : [];
+            
+            const populateSelect = (id, items) => {
+                const select = document.getElementById(id);
+                if (select) {
+                    select.innerHTML = '<option value="">—</option>';
+                    items.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item;
+                        option.text = item;
+                        select.appendChild(option);
+                    });
                 }
-                const countrySelect = document.getElementById('countrySelect');
-                if (countrySelect) {
-                    countrySelect.innerHTML = '<option value="">—</option>';
-                    countries.forEach(c => { const o = document.createElement('option'); o.value = c; o.text = c; countrySelect.appendChild(o); });
-                }
+            };
+            
+            populateSelect('templateSelect', templates);
+            populateSelect('countrySelect', countries);
 
-                // wire live-updating example filename
-                function updateExampleFilename() {
-                    const el = document.getElementById('exampleFilename');
-                    if (!el) return;
-                    // ensure currentId is used for preset portion
-                    const name = buildExportFilename(currentId || '');
-                    el.textContent = name;
-                }
+            // Wire live-updating example filename
+            function updateExampleFilename() {
+                const el = document.getElementById('exampleFilename');
+                if (el) el.textContent = buildExportFilename(currentId || '');
+            }
 
-                const tplEl = document.getElementById('templateSelect');
-                const countryEl = document.getElementById('countrySelect');
-                if (tplEl) tplEl.addEventListener('change', updateExampleFilename);
-                if (countryEl) countryEl.addEventListener('change', updateExampleFilename);
+            const templateSelect = document.getElementById('templateSelect');
+            const countrySelect = document.getElementById('countrySelect');
+            if (templateSelect) templateSelect.addEventListener('change', updateExampleFilename);
+            if (countrySelect) countrySelect.addEventListener('change', updateExampleFilename);
 
-                // Expose updater for other parts of the app
-                window.updateExampleFilename = updateExampleFilename;
-
-                // initialize the example filename
-                setTimeout(() => { try { updateExampleFilename(); } catch (e) {} }, 60);
-            } catch (e) { console.warn('Failed to populate export selects from presets.json', e); }
+            window.updateExampleFilename = updateExampleFilename;
+            setTimeout(updateExampleFilename, 60);
 
             // reflect persisted modified/linked state in the UI
             Object.keys(cropMemory).forEach(id => {
@@ -329,45 +327,16 @@
                 sizeBadge.classList.toggle('active', enabled);
                 if (enabled) exportScaleEnabled[cfg.id] = true;
 
-                // Wire size badge click to toggle scaling (stop propagation so it doesn't select the preset)
+                // Wire size badge click to toggle scaling
                 sizeBadge.style.cursor = 'pointer';
                 sizeBadge.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const cur = !!exportScaleEnabled[cfg.id];
-                    exportScaleEnabled[cfg.id] = !cur;
-                    sizeBadge.classList.toggle('active', !cur);
+                    exportScaleEnabled[cfg.id] = !exportScaleEnabled[cfg.id];
+                    sizeBadge.classList.toggle('active', exportScaleEnabled[cfg.id]);
                     saveStateToStorage();
-                    // Update dim-display with new output dimensions when scaling is toggled
+                    // Update dim-display if this is the current preset
                     if (cfg.id === currentId && cropMemory[currentId]) {
-                        try {
-                            const d = cropMemory[currentId];
-                            const display = document.getElementById('dim-display');
-                            if (display) {
-                                const preset = presetConfig[currentId] || {};
-                                const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
-                                const scalingEnabled = !cur; // this is the NEW state (after toggle)
-
-                                const srcW = Math.round(d.width);
-                                const srcH = Math.round(d.height);
-                                let outW = srcW, outH = srcH;
-                                if (preset.exportSize && scalingEnabled) {
-                                    outW = Number(preset.exportSize.width) || outW;
-                                    outH = Number(preset.exportSize.height) || outH;
-                                    if (!preset.exportSize.allowUpscale) {
-                                        const scale = Math.min(1, srcW / outW, srcH / outH);
-                                        outW = Math.max(1, Math.round(outW * scale));
-                                        outH = Math.max(1, Math.round(outH * scale));
-                                    }
-                                }
-
-                                const minText = (Math.min(srcW, srcH) < (preset.minSize || 500)) ? ` <b>|TOO SMALL — min ${preset.minSize || 500}px</b>` : '';
-                                const willUpscale = (outW > srcW || outH > srcH);
-                                const upscaleText = (willUpscale && allowUpscale && scalingEnabled) ? ` <b>| Will upscale on export</b>` : '';
-                                const allowStateText = preset.exportSize ? ` | Upscale: ${allowUpscale ? 'allowed' : 'disabled'}` : '';
-                                display.className = Math.min(srcW, srcH) < (preset.minSize || 500) ? 'warning' : '';
-                                display.innerHTML = `Crop: ${srcW}x${srcH}px | Output: ${outW}x${outH}px${minText}${upscaleText}${upscaleText ? '' : allowStateText}`;
-                            }
-                        } catch (e) { /* ignore */ }
+                        updateDimDisplayForId(currentId, cropMemory[currentId]);
                     }
                 });
 
@@ -387,27 +356,35 @@
             document.getElementById('canvas-wrapper').style.display = 'block';
             if (cropper) cropper.destroy();
             cropMemory = {};
-            // clear adjusted flags and last centers so previous image adjustments do not carry over
+            // Clear adjusted flags and last centers
             Object.keys(adjustedState).forEach(k => delete adjustedState[k]);
             Object.keys(lastCenters).forEach(k => delete lastCenters[k]);
             document.querySelectorAll('.crop-btn').forEach(b => b.classList.remove('is-modified'));
-            // persist cleared adjustedState
-            saveStateToStorage();
-            // clear any badge warning state from previous image
-            try { Object.keys(sizeBadges).forEach(k => { const b = sizeBadges[k]; if (b) { b.classList.remove('too-small-upscale'); b.classList.remove('too-small-no-upscale'); } }); } catch (er) {}
-            ['downloadBtn', 'bulkBtn', 'dataBtn', 'resetViewBtn'].forEach(id => document.getElementById(id).disabled = false);
-            // show the reset view button once an image has been loaded
-            const rv = document.getElementById('resetViewBtn'); if (rv) rv.style.display = 'inline-block';
-            // show export config controls
-            const ec = document.getElementById('export-config'); if (ec) ec.style.display = 'flex';
+            
+            // Clear badge warning states
+            Object.keys(sizeBadges).forEach(k => {
+                const badge = sizeBadges[k];
+                if (badge) badge.classList.remove('too-small-upscale', 'too-small-no-upscale');
+            });
+            
+            // Enable action buttons and show controls
+            ['downloadBtn', 'bulkBtn', 'dataBtn', 'resetViewBtn'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.disabled = false;
+                    if (id === 'resetViewBtn') el.style.display = 'inline-block';
+                }
+            });
+            
+            const exportConfig = document.getElementById('export-config');
+            if (exportConfig) exportConfig.style.display = 'flex';
 
-            // store original file name info for exports
-            try {
-                currentOriginalFilename = file.name || '';
-                // remove extension for basename
-                const idx = currentOriginalFilename.lastIndexOf('.');
-                currentOriginalBasename = idx > 0 ? currentOriginalFilename.substring(0, idx) : currentOriginalFilename;
-            } catch (e) { currentOriginalFilename = currentOriginalBasename = ''; }
+            // Store original filename info for exports
+            currentOriginalFilename = file.name || '';
+            const idx = currentOriginalFilename.lastIndexOf('.');
+            currentOriginalBasename = idx > 0 ? currentOriginalFilename.substring(0, idx) : currentOriginalFilename;
+
+            saveStateToStorage();
 
             initCropper();
         };
@@ -422,54 +399,19 @@
             crop(event) {
                 if (isSwitching) return;
                 const d = cropper.getData(true);
-                const min = presetConfig[currentId].minSize || 500;
+                const preset = presetConfig[currentId] || {};
+                const min = preset.minSize || 500;
                 const isTooSmall = Math.min(d.width, d.height) < min;
                 
-                const display = document.getElementById('dim-display');
-                display.className = isTooSmall ? 'warning' : '';
-                
-                const preset = presetConfig[currentId] || {};
-                const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
-                const scalingEnabled = exportScaleEnabled.hasOwnProperty(currentId) ? !!exportScaleEnabled[currentId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
-
-                // Compute source (crop) and output dimensions
-                const srcW = Math.round(d.width);
-                const srcH = Math.round(d.height);
-                let outW = srcW, outH = srcH;
-                if (preset.exportSize && scalingEnabled) {
-                    outW = Number(preset.exportSize.width) || outW;
-                    outH = Number(preset.exportSize.height) || outH;
-                    if (!preset.exportSize.allowUpscale) {
-                        const scale = Math.min(1, srcW / outW, srcH / outH);
-                        outW = Math.max(1, Math.round(outW * scale));
-                        outH = Math.max(1, Math.round(outH * scale));
-                    }
-                }
-
-                const minText = (Math.min(srcW, srcH) < (preset.minSize || 500)) ? ` <b>| TOO SMALL — min ${preset.minSize || 500}px</b>` : '';
-                const willUpscale = (outW > srcW || outH > srcH);
-                const upscaleText = (willUpscale && allowUpscale && scalingEnabled) ? ` <b style="color: #ff6666;">(Will upscale on export)</b>` : '';
-                const allowStateText = preset.exportSize ? ` | Upscale: ${allowUpscale ? 'allowed' : 'disabled'}` : '';
-
-                display.innerHTML = `Crop: ${srcW}x${srcH}px | Output: ${outW}x${outH}px${minText}${upscaleText}${upscaleText ? '' : allowStateText}`;
-                
-                // compute new center
+                // Compute new center for linked preset management
                 const newCenter = { x: d.x + d.width/2, y: d.y + d.height/2 };
 
-                // determine if this is the first adjustment for this preset
-                const firstAdjust = !cropMemory[currentId];
-
-                // store the data for this preset
+                // Store crop data for this preset
                 cropMemory[currentId] = { ...d };
-                if (currentBtn) {
-                    currentBtn.classList.add('is-modified');
-                }
-
-                // mark as adjusted (this distinguishes a reposition from default/cleared state)
+                if (currentBtn) currentBtn.classList.add('is-modified');
                 adjustedState[currentId] = true;
-                saveStateToStorage();
 
-                // If this preset had a previous center, apply delta to linked presets
+                // Apply delta to linked presets if center moved
                 const prev = lastCenters[currentId];
                 if (prev) {
                     const dx = newCenter.x - prev.x;
@@ -478,54 +420,23 @@
                         applyCenterDeltaToLinked(dx, dy, currentId);
                     }
                 }
-
-                // update last center for this preset
                 lastCenters[currentId] = newCenter;
 
-                // toggle visual state on the cropper container so guide lines/borders can change color
-                try {
-                    const container = document.querySelector('.cropper-container');
-                    if (container) container.classList.toggle('too-small', isTooSmall);
-                } catch (e) { /* ignore */ }
+                // Update visual states
+                const container = document.querySelector('.cropper-container');
+                if (container) container.classList.toggle('too-small', isTooSmall);
+                
+                const badge = sizeBadges[currentId];
+                const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
+                if (badge) {
+                    badge.classList.toggle('too-small-upscale', isTooSmall && allowUpscale);
+                    badge.classList.toggle('too-small-no-upscale', isTooSmall && !allowUpscale);
+                }
 
-                // If this preset allows upscaling for export and the crop is too small,
-                // mark the size badge with the appropriate class depending on allowUpscale.
-                try {
-                    const badge = sizeBadges[currentId];
-                    const preset = presetConfig[currentId] || {};
-                    const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
-                    if (badge) {
-                        badge.classList.toggle('too-small-upscale', isTooSmall && allowUpscale);
-                        badge.classList.toggle('too-small-no-upscale', isTooSmall && !allowUpscale);
-                    }
-                    // Update dim-display to show size and upscale warning when reapplying stored crop
-                    try {
-                        const display = document.getElementById('dim-display');
-                        if (display) {
-                            const srcW = Math.round(d.width);
-                            const srcH = Math.round(d.height);
-                            const scalingEnabled = exportScaleEnabled.hasOwnProperty(currentId) ? !!exportScaleEnabled[currentId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
-                            let outW = srcW, outH = srcH;
-                            if (preset.exportSize && scalingEnabled) {
-                                outW = Number(preset.exportSize.width) || outW;
-                                outH = Number(preset.exportSize.height) || outH;
-                                if (!preset.exportSize.allowUpscale) {
-                                    const scale = Math.min(1, srcW / outW, srcH / outH);
-                                    outW = Math.max(1, Math.round(outW * scale));
-                                    outH = Math.max(1, Math.round(outH * scale));
-                                }
-                            }
-                            const minText = (Math.min(srcW, srcH) < (preset.minSize || 500)) ? ` <b>| TOO SMALL — min ${preset.minSize || 500}px</b>` : '';
-                            const willUpscale = (outW > srcW || outH > srcH);
-                            const upscaleText = (willUpscale && allowUpscale && scalingEnabled) ? ` <b>| Will upscale on export </b>` : '';
-                            const allowStateText = preset.exportSize ? ` | Upscale: ${allowUpscale ? 'allowed' : 'disabled'}` : '';
-                            display.className = Math.min(srcW, srcH) < (preset.minSize || 500) ? 'warning' : '';
-                            display.innerHTML = `Crop: ${srcW}x${srcH}px | Output: ${outW}x${outH}px${minText}${upscaleText}${upscaleText ? '' : allowStateText}`;
-                        }
-                    } catch (e) { /* ignore */ }
-                } catch (e) { /* ignore */ }
+                // Update dim-display with crop info
+                updateDimDisplayForId(currentId, d);
 
-                // persist crop changes
+                // Persist changes
                 saveStateToStorage();
             },
             ready: updateUIOverlay
@@ -543,51 +454,36 @@
         cropper.setAspectRatio(effectiveRatio);
         if (cropMemory[currentId]) {
             cropper.setData(cropMemory[currentId]);
-            // initialize last center for newly-selected preset
             const d = cropMemory[currentId];
             lastCenters[currentId] = { x: d.x + d.width/2, y: d.y + d.height/2 };
-            // update size badge state for the selected preset (in case it was too-small)
-            try {
-                const min = presetConfig[currentId].minSize || 500;
-                const isTooSmall = Math.min(d.width, d.height) < min;
-                const badge = sizeBadges[currentId];
-                const preset = presetConfig[currentId] || {};
-                const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
-                if (badge) {
-                    badge.classList.toggle('too-small-upscale', isTooSmall && allowUpscale);
-                    badge.classList.toggle('too-small-no-upscale', isTooSmall && !allowUpscale);
-                }
-            } catch (e) {}
-            // update dim-display with crop details
-            updateDimDisplayForId(currentId, cropMemory[currentId]);
+            
+            // Update size badge and dim-display
+            const preset = presetConfig[currentId] || {};
+            const min = preset.minSize || 500;
+            const isTooSmall = Math.min(d.width, d.height) < min;
+            const badge = sizeBadges[currentId];
+            const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
+            if (badge) {
+                badge.classList.toggle('too-small-upscale', isTooSmall && allowUpscale);
+                badge.classList.toggle('too-small-no-upscale', isTooSmall && !allowUpscale);
+            }
+            updateDimDisplayForId(currentId, d);
+        } else {
+            // No stored crop - show preset info and clear badge warnings
+            const badge = sizeBadges[currentId];
+            if (badge) {
+                badge.classList.remove('too-small-upscale', 'too-small-no-upscale');
+            }
+            updateDimDisplayForId(currentId, null);
         }
-        else {
-            // no stored crop for this preset — show preset info (min size & upscale state)
-            try {
-                const display = document.getElementById('dim-display');
-                const preset = presetConfig[currentId] || {};
-                const min = preset.minSize || 500;
-                const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
-                const scalingEnabled = exportScaleEnabled.hasOwnProperty(currentId) ? !!exportScaleEnabled[currentId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
-                let outText = '—';
-                if (preset.exportSize && scalingEnabled) {
-                    outText = `${preset.exportSize.width}x${preset.exportSize.height}`;
-                }
-                const allowStateText = preset.exportSize ? ` <text>Upscale: ${allowUpscale ? 'allowed' : 'disabled'}</text>` : '';
-                if (display) {
-                    display.className = '';
-                    display.innerHTML = `Preset: ${preset.title || currentId} | Min: ${min}px | Output: ${outText}${allowStateText}`;
-                }
-                // clear any badge warning state for this preset
-                const badge = sizeBadges[currentId];
-                if (badge) { badge.classList.remove('too-small-upscale'); badge.classList.remove('too-small-no-upscale'); }
-            } catch (e) { /* ignore */ }
-        }
-        // clear any previous too-small highlight when switching presets
-        try { const container = document.querySelector('.cropper-container'); if (container) container.classList.remove('too-small'); } catch(e){}
+        // Clear previous too-small highlight when switching presets
+        const container = document.querySelector('.cropper-container');
+        if (container) container.classList.remove('too-small');
 
         updateUIOverlay();
-        try { if (typeof window.updateExampleFilename === 'function') window.updateExampleFilename(); } catch(e){}
+        if (typeof window.updateExampleFilename === 'function') {
+            window.updateExampleFilename();
+        }
         setTimeout(() => { isSwitching = false; }, 150);
     }
 
@@ -667,18 +563,20 @@
         saveStateToStorage();
     }
 
-    // Reset a preset's stored crop data and (if active) reset the cropper view
+    // Reset a preset's stored crop data
     function resetPresetCrop(id, resetBtn, parentBtn) {
         delete cropMemory[id];
         delete lastCenters[id];
-        parentBtn.classList.remove('is-modified');
-
-        // persist removal
-        // clear adjusted state
         delete adjustedState[id];
+        parentBtn.classList.remove('is-modified');
+        
+        // Clear badge warning state
+        const badge = sizeBadges[id];
+        if (badge) badge.classList.remove('too-small-upscale', 'too-small-no-upscale');
+        
         saveStateToStorage();
 
-        // If the preset is currently selected, reset the cropper view to initial state
+        // If this is the current preset, reset the cropper view
         if (id === currentId && cropper) {
             isSwitching = true;
             try {
@@ -688,15 +586,18 @@
                 initCropper();
             }
             const r = presetConfig[currentId]?.ratio;
-            try { cropper.setAspectRatio((typeof r === 'number' && isFinite(r)) ? r : NaN); } catch (e) {}
+            try { 
+                cropper.setAspectRatio((typeof r === 'number' && isFinite(r)) ? r : NaN); 
+            } catch (e) {}
+            
+            const container = document.querySelector('.cropper-container');
+            if (container) container.classList.remove('too-small');
+            
             updateUIOverlay();
-            try { const container = document.querySelector('.cropper-container'); if (container) container.classList.remove('too-small'); } catch(e){}
             setTimeout(() => { isSwitching = false; }, 120);
         } else {
             updateUIOverlay();
         }
-        // clear any badge warning state for this preset
-        try { const b = sizeBadges[id]; if (b) { b.classList.remove('too-small-upscale'); b.classList.remove('too-small-no-upscale'); } } catch (e) {}
     }
 
     // Reset image position & zoom (preserves crop data if present)
