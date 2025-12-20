@@ -763,9 +763,10 @@
         if (!cropper || !cropMemory[currentId]) return;
         const filename = buildExportFilename(currentId);
         const canvas = getCroppedCanvasScaled(cropMemory[currentId], currentId);
+        const quality = presetConfig.__meta__?.jpegQuality || 0.95;
         canvas.toBlob(blob => {
             saveAs(blob, filename);
-        }, 'image/jpeg', 0.95);
+        }, 'image/jpeg', quality);
     }
 
     function generateGallery() {
@@ -791,9 +792,10 @@
                     const item = document.createElement('div');
                     item.className = 'gallery-item';
                     const filename = buildExportFilename(id);
+                    const thumbQuality = presetConfig.__meta__?.thumbnailQuality || 0.5;
 
                     item.innerHTML = `
-                        <img src="${canvas.toDataURL('image/jpeg', 0.5)}">
+                        <img src="${canvas.toDataURL('image/jpeg', thumbQuality)}">
                         <span style="display:block; margin-bottom:6px; font-weight:bold;">${presetConfig[id]?.title || id}</span>
                         <div style="font-family: monospace; font-size:0.85rem; color:#ddd; margin-bottom:8px; word-break:break-all;">${filename}</div>
                         <button class="action-btn download-btn" onclick="downloadSingleFromGallery('${id}')">Download JPG</button>
@@ -822,16 +824,18 @@
     window.downloadSingleFromGallery = (id) => {
         const filename = buildExportFilename(id);
         const canvas = getCroppedCanvasScaled(cropMemory[id], id);
-        canvas.toBlob(blob => saveAs(blob, filename), 'image/jpeg', 0.95);
+        const quality = presetConfig.__meta__?.jpegQuality || 0.95;
+        canvas.toBlob(blob => saveAs(blob, filename), 'image/jpeg', quality);
     };
 
     async function downloadAllAsZip() {
         const zip = new JSZip();
         const modifiedIds = Object.keys(cropMemory);
+        const quality = presetConfig.__meta__?.jpegQuality || 0.95;
 
         for (const id of modifiedIds) {
             const canvas = getCroppedCanvasScaled(cropMemory[id], id);
-            const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));
+            const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
             const filename = buildExportFilename(id);
             zip.file(filename, blob);
         }

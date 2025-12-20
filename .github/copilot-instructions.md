@@ -113,10 +113,7 @@ Export quality optimization (lines 721-763): Repeatedly halve canvas size until 
 3. Test aspect ratio math (height = width / ratio)
 
 ### Changing Export Quality
-Modify the JPEG quality parameter (currently `0.95`) in:
-- `performCrop()` line 771
-- `downloadSingleFromGallery()` line 839
-- `downloadAllAsZip()` line 846
+Modify the `jpegQuality` value in [presets.json](../presets.json) `__meta__` section (default: `0.95` for exports, `0.5` for gallery thumbnails). All export functions read from this centralized config.
 
 ### Adding UI Overlay Guides
 Update preset's `overlays` array in presets.json with percentage-based boxes:

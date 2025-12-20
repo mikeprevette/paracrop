@@ -10,6 +10,8 @@
 "free": { "title": "Free Crop", "group": "Custom", "ratio": null, "minSize": 0, "prefix": "custom", "overlays": [] },
 "__meta__": {
 	"templates": ["TEMPLATE_A","TEMPLATE_B","TEMPLATE_C"],
-	"countries": ["US","GB","DE","FR"]
+	"countries": ["US","GB","DE","FR"],
+	"jpegQuality": 0.95,
+	"thumbnailQuality": 0.5
 	}
 }
