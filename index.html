@@ -169,6 +169,7 @@
         });
 
     let cropper, currentId = "default", currentBtn, cropMemory = {}, isSwitching = false, showOverlays = true;
+    const sizeBadges = {}; // map presetId -> sizeBadge element
     const imgElement = document.getElementById('image');
     const exportScaleEnabled = {};
     let currentOriginalFilename = '';
@@ -263,12 +264,7 @@
                 linkBtn.title = 'Link center for group move';
                 linkBtn.innerText = '🔗';
 
-                // Export scale toggle (per-preset)
-                const scaleBtn = document.createElement('button');
-                scaleBtn.type = 'button';
-                scaleBtn.className = 'link-toggle scale-toggle';
-                scaleBtn.title = 'Toggle scaled export for this preset';
-                scaleBtn.innerText = 'S';
+                // Note: export scaling is toggled by clicking the size badge (see below)
 
                 // If preset has exportSize, show a small badge of target size
                 const sizeBadge = document.createElement('span');
@@ -278,6 +274,8 @@
                 } else {
                     sizeBadge.style.display = 'none';
                 }
+                // register badge for runtime updates
+                sizeBadges[cfg.id] = sizeBadge;
 
                 const statusDot = document.createElement('span');
                 statusDot.className = 'status-dot';
@@ -301,7 +299,6 @@
 
                 rightControls.appendChild(resetBtn);
                 rightControls.appendChild(linkBtn);
-                rightControls.appendChild(scaleBtn);
 
                 const topLine = document.createElement('div');
                 topLine.className = 'preset-top';
@@ -328,18 +325,19 @@
                 if (adjustedState[cfg.id]) {
                     btn.classList.add('is-modified');
                 }
-                // export scale persisted or default
+                // export scale persisted or default — show via size badge
                 const scaleDefault = (cfg.exportSize && cfg.exportSize.width && cfg.exportSize.height) ? true : false;
                 const enabled = (exportScaleEnabled.hasOwnProperty(cfg.id)) ? !!exportScaleEnabled[cfg.id] : scaleDefault;
-                scaleBtn.classList.toggle('active', enabled);
+                sizeBadge.classList.toggle('active', enabled);
                 if (enabled) exportScaleEnabled[cfg.id] = true;
 
-                // Wire scale toggle click
-                scaleBtn.addEventListener('click', (e) => {
+                // Wire size badge click to toggle scaling (stop propagation so it doesn't select the preset)
+                sizeBadge.style.cursor = 'pointer';
+                sizeBadge.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const cur = !!exportScaleEnabled[cfg.id];
                     exportScaleEnabled[cfg.id] = !cur;
-                    scaleBtn.classList.toggle('active', !cur);
+                    sizeBadge.classList.toggle('active', !cur);
                     saveStateToStorage();
                 });
 
@@ -365,6 +363,8 @@
             document.querySelectorAll('.crop-btn').forEach(b => b.classList.remove('is-modified'));
             // persist cleared adjustedState
             saveStateToStorage();
+            // clear any badge warning state from previous image
+            try { Object.keys(sizeBadges).forEach(k => { const b = sizeBadges[k]; if (b) { b.classList.remove('too-small-upscale'); b.classList.remove('too-small-no-upscale'); } }); } catch (er) {}
             ['downloadBtn', 'bulkBtn', 'dataBtn', 'resetViewBtn'].forEach(id => document.getElementById(id).disabled = false);
             // show the reset view button once an image has been loaded
             const rv = document.getElementById('resetViewBtn'); if (rv) rv.style.display = 'inline-block';
@@ -400,7 +400,12 @@
                 
                 // Displaying TL and BR coordinates (include preset minimum when too small)
                 const minText = isTooSmall ? ` <b>(TOO SMALL — min ${min}px)</b>` : '';
-                display.innerHTML = `Size: ${Math.round(d.width)}x${Math.round(d.height)}px | TL: ${Math.round(d.x)},${Math.round(d.y)} | BR: ${Math.round(d.x+d.width)},${Math.round(d.y+d.height)}${minText}`;
+                // if upscaling is allowed for this preset and crop is too small, warn user
+                const preset = presetConfig[currentId] || {};
+                const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
+                const scalingEnabled = exportScaleEnabled.hasOwnProperty(currentId) ? !!exportScaleEnabled[currentId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
+                const upscaleText = (isTooSmall && allowUpscale && scalingEnabled) ? ` <b style="color: #ff6666;">(Will upscale on export)</b>` : '';
+                display.innerHTML = `Size: ${Math.round(d.width)}x${Math.round(d.height)}px | TL: ${Math.round(d.x)},${Math.round(d.y)} | BR: ${Math.round(d.x+d.width)},${Math.round(d.y+d.height)}${minText}${upscaleText}`;
                 
                 // compute new center
                 const newCenter = { x: d.x + d.width/2, y: d.y + d.height/2 };
@@ -437,6 +442,29 @@
                     if (container) container.classList.toggle('too-small', isTooSmall);
                 } catch (e) { /* ignore */ }
 
+                // If this preset allows upscaling for export and the crop is too small,
+                // mark the size badge with the appropriate class depending on allowUpscale.
+                try {
+                    const badge = sizeBadges[currentId];
+                    const preset = presetConfig[currentId] || {};
+                    const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
+                    if (badge) {
+                        badge.classList.toggle('too-small-upscale', isTooSmall && allowUpscale);
+                        badge.classList.toggle('too-small-no-upscale', isTooSmall && !allowUpscale);
+                    }
+                    // Update dim-display to show size and upscale warning when reapplying stored crop
+                    try {
+                        const display = document.getElementById('dim-display');
+                        if (display) {
+                            const minText = isTooSmall ? ` <b>(TOO SMALL — min ${min}px)</b>` : '';
+                            const scalingEnabled = exportScaleEnabled.hasOwnProperty(currentId) ? !!exportScaleEnabled[currentId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
+                            const upscaleText = (isTooSmall && allowUpscale && scalingEnabled) ? ` <b style="color: #ff6666;">(Will upscale on export)</b>` : '';
+                            display.className = isTooSmall ? 'warning' : '';
+                            display.innerHTML = `Size: ${Math.round(d.width)}x${Math.round(d.height)}px | TL: ${Math.round(d.x)},${Math.round(d.y)} | BR: ${Math.round(d.x+d.width)},${Math.round(d.y+d.height)}${minText}${upscaleText}`;
+                        }
+                    } catch (e) {}
+                } catch (e) { /* ignore */ }
+
                 // persist crop changes
                 saveStateToStorage();
             },
@@ -458,6 +486,18 @@
             // initialize last center for newly-selected preset
             const d = cropMemory[currentId];
             lastCenters[currentId] = { x: d.x + d.width/2, y: d.y + d.height/2 };
+            // update size badge state for the selected preset (in case it was too-small)
+            try {
+                const min = presetConfig[currentId].minSize || 500;
+                const isTooSmall = Math.min(d.width, d.height) < min;
+                const badge = sizeBadges[currentId];
+                const preset = presetConfig[currentId] || {};
+                const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
+                if (badge) {
+                    badge.classList.toggle('too-small-upscale', isTooSmall && allowUpscale);
+                    badge.classList.toggle('too-small-no-upscale', isTooSmall && !allowUpscale);
+                }
+            } catch (e) {}
         }
         // clear any previous too-small highlight when switching presets
         try { const container = document.querySelector('.cropper-container'); if (container) container.classList.remove('too-small'); } catch(e){}
@@ -531,6 +571,8 @@
         } else {
             updateUIOverlay();
         }
+        // clear any badge warning state for this preset
+        try { const b = sizeBadges[id]; if (b) { b.classList.remove('too-small-upscale'); b.classList.remove('too-small-no-upscale'); } } catch (e) {}
     }
 
     // Reset image position & zoom (preserves crop data if present)
