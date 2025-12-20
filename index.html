@@ -53,16 +53,14 @@
             <div id="dynamic-presets"></div>
             <div class="group-label">Tools</div>
             <button class="crop-btn" style="width:100%" onclick="toggleOverlays()"><span id="toggle-text">Hide UI Guides</span></button>
-
-            
+            <button id="resetViewBtn" class="crop-btn" onclick="resetImageView()" disabled style="width:100%; display:none; margin-top:8px;">Reset Image Position & Zoom</button>
 
             <!-- export panel moved into editor column -->
         </div>
 
         <div class="editor-col">
-            <div id="dim-display">Waiting for image upload...</div>
             <div class="img-container" id="canvas-wrapper"><img id="image"></div>
-            <button id="resetViewBtn" class="reset-view-btn" onclick="resetImageView()" disabled style="display:none">Reset Image Position & Zoom</button>
+            <div id="dim-display">Waiting for image upload...</div>
             <!-- editor controls moved here from sidebar -->
             <div style="width:100%; margin-top:18px;">
                 <div class="btn-stack" style="flex-direction: row; gap: 10px;">
@@ -405,7 +403,8 @@
                 const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
                 const scalingEnabled = exportScaleEnabled.hasOwnProperty(currentId) ? !!exportScaleEnabled[currentId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
                 const upscaleText = (isTooSmall && allowUpscale && scalingEnabled) ? ` <b style="color: #ff6666;">(Will upscale on export)</b>` : '';
-                display.innerHTML = `Size: ${Math.round(d.width)}x${Math.round(d.height)}px | TL: ${Math.round(d.x)},${Math.round(d.y)} | BR: ${Math.round(d.x+d.width)},${Math.round(d.y+d.height)}${minText}${upscaleText}`;
+                const allowStateText = preset.exportSize ? ` <b style="">| Upscale: ${allowUpscale ? 'allowed' : 'disabled'}</b>` : '';
+                display.innerHTML = `Size: ${Math.round(d.width)}x${Math.round(d.height)}px | TL: ${Math.round(d.x)},${Math.round(d.y)} | BR: ${Math.round(d.x+d.width)},${Math.round(d.y+d.height)}${minText}${upscaleText}${allowStateText}`;
                 
                 // compute new center
                 const newCenter = { x: d.x + d.width/2, y: d.y + d.height/2 };
@@ -458,9 +457,10 @@
                         if (display) {
                             const minText = isTooSmall ? ` <b>(TOO SMALL — min ${min}px)</b>` : '';
                             const scalingEnabled = exportScaleEnabled.hasOwnProperty(currentId) ? !!exportScaleEnabled[currentId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
-                            const upscaleText = (isTooSmall && allowUpscale && scalingEnabled) ? ` <b style="color: #ff6666;">(Will upscale on export)</b>` : '';
+                                const upscaleText = (isTooSmall && allowUpscale && scalingEnabled) ? ` <b style="color: #ff6666;">(Will upscale on export)</b>` : '';
+                                const allowStateText = preset.exportSize ? ` <small style="color:#999;">(Upscale: ${allowUpscale ? 'allowed' : 'disabled'})</small>` : '';
                             display.className = isTooSmall ? 'warning' : '';
-                            display.innerHTML = `Size: ${Math.round(d.width)}x${Math.round(d.height)}px | TL: ${Math.round(d.x)},${Math.round(d.y)} | BR: ${Math.round(d.x+d.width)},${Math.round(d.y+d.height)}${minText}${upscaleText}`;
+                            display.innerHTML = `Size: ${Math.round(d.width)}x${Math.round(d.height)}px | TL: ${Math.round(d.x)},${Math.round(d.y)} | BR: ${Math.round(d.x+d.width)},${Math.round(d.y+d.height)}${minText}${upscaleText}${allowStateText}`;
                         }
                     } catch (e) {}
                 } catch (e) { /* ignore */ }
@@ -498,6 +498,23 @@
                     badge.classList.toggle('too-small-no-upscale', isTooSmall && !allowUpscale);
                 }
             } catch (e) {}
+        }
+        else {
+            // no stored crop for this preset — show preset info (min size & upscale state)
+            try {
+                const display = document.getElementById('dim-display');
+                const preset = presetConfig[currentId] || {};
+                const min = preset.minSize || 500;
+                const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
+                const allowStateText = preset.exportSize ? ` <small style="color:#999;">(Upscale: ${allowUpscale ? 'allowed' : 'disabled'})</small>` : '';
+                if (display) {
+                    display.className = '';
+                    display.innerHTML = `Preset: ${preset.title || currentId} | Min: ${min}px${allowStateText}`;
+                }
+                // clear any badge warning state for this preset
+                const badge = sizeBadges[currentId];
+                if (badge) { badge.classList.remove('too-small-upscale'); badge.classList.remove('too-small-no-upscale'); }
+            } catch (e) { /* ignore */ }
         }
         // clear any previous too-small highlight when switching presets
         try { const container = document.querySelector('.cropper-container'); if (container) container.classList.remove('too-small'); } catch(e){}

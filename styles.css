@@ -43,7 +43,7 @@ header {
 .active .status-dot { border-color: white; background: white; }
 
 .editor-col { display: flex; flex-direction: column; align-items: flex-start; }
-.img-container { max-height: 70vh; width: 100%; background-color: var(--dark); border-radius: 8px; overflow: hidden; display: none; }
+.img-container { max-height: 70vh; width: 100%; background-color: var(--dark); border-radius: 8px 8px 0px 0px; overflow: hidden; display: none; }
 img { display: block; max-width: 100%; }
         
 #dim-display { 
@@ -51,6 +51,7 @@ img { display: block; max-width: 100%; }
             padding: 12px 16px; border-radius: 6px; font-family: 'Courier New', monospace; 
             font-size: 0.8rem; line-height: 1.4; width: 100%; box-sizing: border-box; 
             border: 1px solid transparent; transition: all 0.2s;
+            border-radius: 0px 0px 8px 8px;
         }
 
 #dim-display.warning {
@@ -66,8 +67,6 @@ img { display: block; max-width: 100%; }
 .bulk-btn { background: var(--bulk); }
 .data-btn { background: var(--info); }
 .action-btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
-.reset-view-btn { margin-top: 14px; padding: 8px 12px; border-radius: 8px; font-weight: 700; background: #f1f3f5; color: #222; border: 1px solid #e6e6e6; cursor: pointer; }
-.reset-view-btn:hover { background: #eef1f4; }
 .export-config { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
 .export-config label { font-size: 0.7rem; color: #666; margin-right: 6px; }
 .export-config select {
