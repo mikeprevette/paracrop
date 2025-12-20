@@ -34,10 +34,13 @@
         .sidebar { display: flex; flex-direction: column; }
         .group-label { font-weight: 700; color: #999; margin: 15px 0 8px 0; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
         .crop-list { display: flex; flex-direction: column; gap: 8px; }
-        .crop-btn { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 0.9rem; transition: 0.12s; text-align: left; width: 100%; box-sizing: border-box; }
+        .crop-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 12px; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 0.9rem; transition: 0.12s; text-align: left; width: 100%; box-sizing: border-box; }
         .crop-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
 
-        .crop-btn .title { flex: 1; text-align: left; padding-right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .crop-btn .title { display: block; width: 100%; text-align: left; padding-right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: normal; font-weight: 700; }
+        .preset-top { display:flex; width:100%; justify-content:space-between; align-items:center; }
+        .preset-bottom { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; }
+        .preset-top .status-dot { margin-left: 8px; }
 
         .preset-controls { display: inline-flex; align-items: center; gap: 8px; }
         .reset-btn, .link-toggle { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; border-radius: 6px; border: 1px solid #e6e6e6; background: #fff; color: #333; cursor: pointer; padding: 0; transition: all 0.12s ease; }
@@ -427,11 +430,19 @@
                 rightControls.appendChild(resetBtn);
                 rightControls.appendChild(linkBtn);
                 rightControls.appendChild(scaleBtn);
-                rightControls.appendChild(statusDot);
-                rightControls.appendChild(sizeBadge);
 
-                btn.appendChild(leftSpan);
-                btn.appendChild(rightControls);
+                const topLine = document.createElement('div');
+                topLine.className = 'preset-top';
+                topLine.appendChild(leftSpan);
+                topLine.appendChild(statusDot);
+
+                const bottomLine = document.createElement('div');
+                bottomLine.className = 'preset-bottom';
+                bottomLine.appendChild(rightControls);
+                bottomLine.appendChild(sizeBadge);
+
+                btn.appendChild(topLine);
+                btn.appendChild(bottomLine);
 
                 // reflect persisted states
                 if (linkedState[cfg.id]) {
@@ -751,15 +762,58 @@
 
             // If target matches source, return source to avoid extra work
             if (targetW === srcCanvas.width && targetH === srcCanvas.height) return srcCanvas;
+            // Progressive downscaling: repeatedly halve the canvas size until near target.
+            // This often yields better quality and can be faster than a single large resample.
+            const needsDownscale = srcCanvas.width > targetW || srcCanvas.height > targetH;
 
-            const out = document.createElement('canvas');
-            out.width = targetW;
-            out.height = targetH;
-            const ctx = out.getContext('2d');
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height, 0, 0, targetW, targetH);
-            return out;
+            if (needsDownscale) {
+                let current = srcCanvas;
+                // If the reduction is small, do a single high-quality draw.
+                const reductionFactorW = current.width / targetW;
+                const reductionFactorH = current.height / targetH;
+                const maxReduction = Math.max(reductionFactorW, reductionFactorH);
+
+                if (maxReduction <= 2) {
+                    const out = document.createElement('canvas');
+                    out.width = targetW; out.height = targetH;
+                    const ctx = out.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(current, 0, 0, current.width, current.height, 0, 0, targetW, targetH);
+                    return out;
+                }
+
+                // Otherwise perform multi-step halving until close to target size
+                while ((current.width / 2) >= targetW || (current.height / 2) >= targetH) {
+                    const tmp = document.createElement('canvas');
+                    tmp.width = Math.max(1, Math.round(current.width / 2));
+                    tmp.height = Math.max(1, Math.round(current.height / 2));
+                    const tctx = tmp.getContext('2d');
+                    tctx.imageSmoothingEnabled = true;
+                    tctx.imageSmoothingQuality = 'high';
+                    tctx.drawImage(current, 0, 0, current.width, current.height, 0, 0, tmp.width, tmp.height);
+                    // prepare for next iteration
+                    current = tmp;
+                }
+
+                // Final pass to exact target size
+                const out = document.createElement('canvas');
+                out.width = targetW; out.height = targetH;
+                const octx = out.getContext('2d');
+                octx.imageSmoothingEnabled = true;
+                octx.imageSmoothingQuality = 'high';
+                octx.drawImage(current, 0, 0, current.width, current.height, 0, 0, targetW, targetH);
+                return out;
+            } else {
+                // Upscale (or equal) - single high-quality draw
+                const out = document.createElement('canvas');
+                out.width = targetW; out.height = targetH;
+                const ctx = out.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height, 0, 0, targetW, targetH);
+                return out;
+            }
         } catch (e) {
             console.warn('getCroppedCanvasScaled failed, falling back to unscaled canvas', e);
             return srcCanvas;
