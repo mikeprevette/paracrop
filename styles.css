@@ -1,0 +1,127 @@
+:root { --primary: #007bff; --success: #28a745; --dark: #1a1a1a; --border: #e0e0e0; --bulk: #9f156e77; --link: #42bc20c6; --zip: #fd7e14; --info: #17a2b8; --danger: #ff4444; }
+body { font-family: 'Inter', -apple-system, sans-serif; padding: 20px; background: #f4f7f9; color: #333; margin: 0; min-height: 100vh; }
+        
+.container { max-width: 1200px; margin: 20px auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); position: relative; z-index: 1; }
+        
+header { 
+            margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid var(--border); 
+            display: flex; justify-content: space-between; align-items: center; gap: 20px;
+        }
+
+.file-upload-wrapper { position: relative; display: inline-block; }
+#imageInput { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.custom-file-btn {
+            display: inline-flex; align-items: center; padding: 12px 24px;
+            background: var(--primary); color: white; border-radius: 8px;
+            font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,123,255,0.2); border: 2px solid transparent;
+        }
+.custom-file-btn:hover { background: #0056b3; transform: translateY(-1px); }
+
+.workspace { display: grid; grid-template-columns: 280px 1fr; gap: 30px; }
+.sidebar { display: flex; flex-direction: column; }
+.group-label { font-weight: 700; color: #999; margin: 15px 0 8px 0; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
+.crop-list { display: flex; flex-direction: column; gap: 8px; }
+.crop-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 12px; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 0.9rem; transition: 0.12s; text-align: left; width: 100%; box-sizing: border-box; }
+.crop-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+.crop-btn .title { display: block; width: 100%; text-align: left; padding-right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: normal; font-weight: 700; }
+.preset-top { display:flex; width:100%; justify-content:space-between; align-items:center; }
+.preset-bottom { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; }
+.preset-top .status-dot { margin-left: 8px; }
+
+.preset-controls { display: inline-flex; align-items: center; gap: 8px; }
+.reset-btn, .link-toggle { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; border-radius: 6px; border: 1px solid #e6e6e6; background: #fff; color: #333; cursor: pointer; padding: 0; transition: all 0.12s ease; }
+.reset-btn:hover, .link-toggle:hover { background: #f6f7f8; }
+.link-toggle.active { background: var(--link); color: #fff; border-color: rgba(0,0,0,0.06); box-shadow: 0 6px 18px rgba(111,66,193,0.12); }
+.crop-btn.linked { box-shadow: 0 0 0 2px rgba(111,66,193,0.06) inset; }
+
+.status-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #ddd; background: transparent; flex-shrink: 0; }
+.is-modified .status-dot { background: var(--success); border-color: var(--success); }
+/* When a preset is both active (selected) and modified, show success color (override white) */
+.crop-btn.active.is-modified .status-dot { background: var(--success); border-color: var(--success); }
+.active .status-dot { border-color: white; background: white; }
+
+.editor-col { display: flex; flex-direction: column; align-items: flex-start; }
+.img-container { max-height: 70vh; width: 100%; background-color: var(--dark); border-radius: 8px; overflow: hidden; display: none; }
+img { display: block; max-width: 100%; }
+        
+#dim-display { 
+            margin-bottom: 15px; background: var(--dark); color: #00ff88; 
+            padding: 12px 16px; border-radius: 6px; font-family: 'Courier New', monospace; 
+            font-size: 0.8rem; line-height: 1.4; width: 100%; box-sizing: border-box; 
+            border: 1px solid transparent; transition: all 0.2s;
+        }
+
+#dim-display.warning {
+            color: var(--danger);
+            border-color: var(--danger);
+            background: rgba(255, 68, 68, 0.1);
+        }
+
+.ui-element-box { position: absolute; background: rgba(60, 60, 60, 0.7); border: 1px solid rgba(255, 255, 255, 0.3); pointer-events: none; z-index: 10; }
+.btn-stack { display: flex; flex-direction: column; gap: 10px; margin-top: 25px; }
+.action-btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: bold; cursor: pointer; transition: 0.2s; color: white; }
+.download-btn { background: var(--success); }
+.bulk-btn { background: var(--bulk); }
+.data-btn { background: var(--info); }
+.action-btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
+.reset-view-btn { margin-top: 14px; padding: 8px 12px; border-radius: 8px; font-weight: 700; background: #f1f3f5; color: #222; border: 1px solid #e6e6e6; cursor: pointer; }
+.reset-view-btn:hover { background: #eef1f4; }
+.export-config { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.export-config label { font-size: 0.7rem; color: #666; margin-right: 6px; }
+.export-config select {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: white;
+            /* font-weight: 600; */
+            font-family: Inter, -apple-system, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            font-size: 0.7rem;
+            color: #222;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            cursor: pointer;
+            min-width: 120px;
+        }
+/* small caret alignment for selects */
+.export-config select::-ms-expand { display: none; }
+
+.size-badge { font-size: 0.7rem; color: #666; background: #f6f7f8; padding: 3px 6px; border-radius:6px; border:1px solid #e6e6e6; margin-left:6px; }
+.scale-toggle { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; border-radius: 6px; border: 1px solid #e6e6e6; background: #fff; color: #333; cursor: pointer; padding: 0; }
+.scale-toggle.active { background: #ffd86b; border-color: #ffcc33; color: #222; }
+
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(18, 18, 18, 0.98); z-index: 9999; overflow-y: auto; }
+.modal-content { max-width: 1100px; margin: 40px auto; padding: 0 20px; color: white; }
+.modal-header { position: sticky; top: 0; background: #121212; padding: 20px 0; display: flex; justify-content: space-between; align-items: center; z-index: 10; border-bottom: 1px solid #333; gap: 15px; }
+        
+.data-table { width: 100%; border-collapse: collapse; margin-top: 30px; background: #222; border-radius: 8px; overflow: hidden; }
+.data-table th, .data-table td { text-align: left; padding: 15px; border-bottom: 1px solid #333; }
+.data-table th { background: #333; color: var(--info); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; }
+
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 30px; padding: 40px 0; }
+.gallery-item { background: #222; padding: 20px; border-radius: 12px; text-align: center; color: white; border: 1px solid #333; }
+.gallery-item img { max-width: 100%; height: auto; border-radius: 6px; margin-bottom: 15px; border: 1px solid #444; }
+        
+#drop-zone-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 123, 255, 0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; color: white; border: 8px dashed white; box-sizing: border-box; }
+/* When crop is too small, make cropper guides/border red */
+.cropper-container.too-small .cropper-view-box,
+.cropper-container.too-small .cropper-face,
+.cropper-container.too-small .cropper-line,
+.cropper-container.too-small .cropper-dashed {
+            border-color: var(--danger) !important;
+            box-shadow: 0 0 0 2px rgba(255,68,68,0.06) inset !important;
+        }
+.cropper-container.too-small .cropper-line { background: var(--danger) !important; }
+/* make the crop handles/points visible in danger color */
+.cropper-container.too-small .cropper-point {
+            background: var(--danger) !important;
+            border-color: var(--danger) !important;
+            box-shadow: none !important;
+        }
+.cropper-container.too-small .cropper-point::before,
+.cropper-container.too-small .cropper-point::after {
+            background: var(--danger) !important;
+        }
