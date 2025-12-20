@@ -455,10 +455,10 @@
                     try {
                         const display = document.getElementById('dim-display');
                         if (display) {
-                            const minText = isTooSmall ? ` <b>(TOO SMALL — min ${min}px)</b>` : '';
+                            const minText = isTooSmall ? ` <b>| TOO SMALL — min ${min}px</b>` : '';
                             const scalingEnabled = exportScaleEnabled.hasOwnProperty(currentId) ? !!exportScaleEnabled[currentId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
-                                const upscaleText = (isTooSmall && allowUpscale && scalingEnabled) ? ` <b style="color: #ff6666;">(Will upscale on export)</b>` : '';
-                                const allowStateText = preset.exportSize ? ` <small style="color:#999;">(Upscale: ${allowUpscale ? 'allowed' : 'disabled'})</small>` : '';
+                                const upscaleText = (isTooSmall && allowUpscale && scalingEnabled) ? ` <b style="color: #ff6666;">| Will upscale on export</b>` : '';
+                                const allowStateText = preset.exportSize ? ` <b style="color: #ff6666;">| Upscale: ${allowUpscale ? 'allowed' : 'disabled'}</b>` : '';
                             display.className = isTooSmall ? 'warning' : '';
                             display.innerHTML = `Size: ${Math.round(d.width)}x${Math.round(d.height)}px | TL: ${Math.round(d.x)},${Math.round(d.y)} | BR: ${Math.round(d.x+d.width)},${Math.round(d.y+d.height)}${minText}${upscaleText}${allowStateText}`;
                         }
@@ -506,7 +506,7 @@
                 const preset = presetConfig[currentId] || {};
                 const min = preset.minSize || 500;
                 const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
-                const allowStateText = preset.exportSize ? ` <small style="color:#999;">(Upscale: ${allowUpscale ? 'allowed' : 'disabled'})</small>` : '';
+                const allowStateText = preset.exportSize ? ` <text style="">| Upscale: ${allowUpscale ? 'allowed' : 'disabled'}</text>` : '';
                 if (display) {
                     display.className = '';
                     display.innerHTML = `Preset: ${preset.title || currentId} | Min: ${min}px${allowStateText}`;
