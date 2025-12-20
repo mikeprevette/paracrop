@@ -337,6 +337,38 @@
                     exportScaleEnabled[cfg.id] = !cur;
                     sizeBadge.classList.toggle('active', !cur);
                     saveStateToStorage();
+                    // Update dim-display with new output dimensions when scaling is toggled
+                    if (cfg.id === currentId && cropMemory[currentId]) {
+                        try {
+                            const d = cropMemory[currentId];
+                            const display = document.getElementById('dim-display');
+                            if (display) {
+                                const preset = presetConfig[currentId] || {};
+                                const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
+                                const scalingEnabled = !cur; // this is the NEW state (after toggle)
+
+                                const srcW = Math.round(d.width);
+                                const srcH = Math.round(d.height);
+                                let outW = srcW, outH = srcH;
+                                if (preset.exportSize && scalingEnabled) {
+                                    outW = Number(preset.exportSize.width) || outW;
+                                    outH = Number(preset.exportSize.height) || outH;
+                                    if (!preset.exportSize.allowUpscale) {
+                                        const scale = Math.min(1, srcW / outW, srcH / outH);
+                                        outW = Math.max(1, Math.round(outW * scale));
+                                        outH = Math.max(1, Math.round(outH * scale));
+                                    }
+                                }
+
+                                const minText = (Math.min(srcW, srcH) < (preset.minSize || 500)) ? ` <b>|TOO SMALL — min ${preset.minSize || 500}px</b>` : '';
+                                const willUpscale = (outW > srcW || outH > srcH);
+                                const upscaleText = (willUpscale && allowUpscale && scalingEnabled) ? ` <b>| Will upscale on export</b>` : '';
+                                const allowStateText = preset.exportSize ? ` | Upscale: ${allowUpscale ? 'allowed' : 'disabled'}` : '';
+                                display.className = Math.min(srcW, srcH) < (preset.minSize || 500) ? 'warning' : '';
+                                display.innerHTML = `Crop: ${srcW}x${srcH}px | Output: ${outW}x${outH}px${minText}${upscaleText}${upscaleText ? '' : allowStateText}`;
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
                 });
 
                 list.appendChild(btn);
@@ -396,15 +428,30 @@
                 const display = document.getElementById('dim-display');
                 display.className = isTooSmall ? 'warning' : '';
                 
-                // Displaying TL and BR coordinates (include preset minimum when too small)
-                const minText = isTooSmall ? ` <b>(TOO SMALL — min ${min}px)</b>` : '';
-                // if upscaling is allowed for this preset and crop is too small, warn user
                 const preset = presetConfig[currentId] || {};
                 const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
                 const scalingEnabled = exportScaleEnabled.hasOwnProperty(currentId) ? !!exportScaleEnabled[currentId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
-                const upscaleText = (isTooSmall && allowUpscale && scalingEnabled) ? ` <b style="color: #ff6666;">(Will upscale on export)</b>` : '';
-                const allowStateText = preset.exportSize ? ` <b style="">| Upscale: ${allowUpscale ? 'allowed' : 'disabled'}</b>` : '';
-                display.innerHTML = `Size: ${Math.round(d.width)}x${Math.round(d.height)}px | TL: ${Math.round(d.x)},${Math.round(d.y)} | BR: ${Math.round(d.x+d.width)},${Math.round(d.y+d.height)}${minText}${upscaleText}${allowStateText}`;
+
+                // Compute source (crop) and output dimensions
+                const srcW = Math.round(d.width);
+                const srcH = Math.round(d.height);
+                let outW = srcW, outH = srcH;
+                if (preset.exportSize && scalingEnabled) {
+                    outW = Number(preset.exportSize.width) || outW;
+                    outH = Number(preset.exportSize.height) || outH;
+                    if (!preset.exportSize.allowUpscale) {
+                        const scale = Math.min(1, srcW / outW, srcH / outH);
+                        outW = Math.max(1, Math.round(outW * scale));
+                        outH = Math.max(1, Math.round(outH * scale));
+                    }
+                }
+
+                const minText = (Math.min(srcW, srcH) < (preset.minSize || 500)) ? ` <b>| TOO SMALL — min ${preset.minSize || 500}px</b>` : '';
+                const willUpscale = (outW > srcW || outH > srcH);
+                const upscaleText = (willUpscale && allowUpscale && scalingEnabled) ? ` <b style="color: #ff6666;">(Will upscale on export)</b>` : '';
+                const allowStateText = preset.exportSize ? ` | Upscale: ${allowUpscale ? 'allowed' : 'disabled'}` : '';
+
+                display.innerHTML = `Crop: ${srcW}x${srcH}px | Output: ${outW}x${outH}px${minText}${upscaleText}${upscaleText ? '' : allowStateText}`;
                 
                 // compute new center
                 const newCenter = { x: d.x + d.width/2, y: d.y + d.height/2 };
@@ -455,14 +502,27 @@
                     try {
                         const display = document.getElementById('dim-display');
                         if (display) {
-                            const minText = isTooSmall ? ` <b>| TOO SMALL — min ${min}px</b>` : '';
+                            const srcW = Math.round(d.width);
+                            const srcH = Math.round(d.height);
                             const scalingEnabled = exportScaleEnabled.hasOwnProperty(currentId) ? !!exportScaleEnabled[currentId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
-                                const upscaleText = (isTooSmall && allowUpscale && scalingEnabled) ? ` <b style="color: #ff6666;">| Will upscale on export</b>` : '';
-                                const allowStateText = preset.exportSize ? ` <b style="color: #ff6666;">| Upscale: ${allowUpscale ? 'allowed' : 'disabled'}</b>` : '';
-                            display.className = isTooSmall ? 'warning' : '';
-                            display.innerHTML = `Size: ${Math.round(d.width)}x${Math.round(d.height)}px | TL: ${Math.round(d.x)},${Math.round(d.y)} | BR: ${Math.round(d.x+d.width)},${Math.round(d.y+d.height)}${minText}${upscaleText}${allowStateText}`;
+                            let outW = srcW, outH = srcH;
+                            if (preset.exportSize && scalingEnabled) {
+                                outW = Number(preset.exportSize.width) || outW;
+                                outH = Number(preset.exportSize.height) || outH;
+                                if (!preset.exportSize.allowUpscale) {
+                                    const scale = Math.min(1, srcW / outW, srcH / outH);
+                                    outW = Math.max(1, Math.round(outW * scale));
+                                    outH = Math.max(1, Math.round(outH * scale));
+                                }
+                            }
+                            const minText = (Math.min(srcW, srcH) < (preset.minSize || 500)) ? ` <b>| TOO SMALL — min ${preset.minSize || 500}px</b>` : '';
+                            const willUpscale = (outW > srcW || outH > srcH);
+                            const upscaleText = (willUpscale && allowUpscale && scalingEnabled) ? ` <b>| Will upscale on export </b>` : '';
+                            const allowStateText = preset.exportSize ? ` | Upscale: ${allowUpscale ? 'allowed' : 'disabled'}` : '';
+                            display.className = Math.min(srcW, srcH) < (preset.minSize || 500) ? 'warning' : '';
+                            display.innerHTML = `Crop: ${srcW}x${srcH}px | Output: ${outW}x${outH}px${minText}${upscaleText}${upscaleText ? '' : allowStateText}`;
                         }
-                    } catch (e) {}
+                    } catch (e) { /* ignore */ }
                 } catch (e) { /* ignore */ }
 
                 // persist crop changes
@@ -498,6 +558,8 @@
                     badge.classList.toggle('too-small-no-upscale', isTooSmall && !allowUpscale);
                 }
             } catch (e) {}
+            // update dim-display with crop details
+            updateDimDisplayForId(currentId, cropMemory[currentId]);
         }
         else {
             // no stored crop for this preset — show preset info (min size & upscale state)
@@ -506,10 +568,15 @@
                 const preset = presetConfig[currentId] || {};
                 const min = preset.minSize || 500;
                 const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
-                const allowStateText = preset.exportSize ? ` <text style="">| Upscale: ${allowUpscale ? 'allowed' : 'disabled'}</text>` : '';
+                const scalingEnabled = exportScaleEnabled.hasOwnProperty(currentId) ? !!exportScaleEnabled[currentId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
+                let outText = '—';
+                if (preset.exportSize && scalingEnabled) {
+                    outText = `${preset.exportSize.width}x${preset.exportSize.height}`;
+                }
+                const allowStateText = preset.exportSize ? ` <text>Upscale: ${allowUpscale ? 'allowed' : 'disabled'}</text>` : '';
                 if (display) {
                     display.className = '';
-                    display.innerHTML = `Preset: ${preset.title || currentId} | Min: ${min}px${allowStateText}`;
+                    display.innerHTML = `Preset: ${preset.title || currentId} | Min: ${min}px | Output: ${outText}${allowStateText}`;
                 }
                 // clear any badge warning state for this preset
                 const badge = sizeBadges[currentId];
@@ -542,6 +609,46 @@
             });
             viewBox.appendChild(div);
         });
+    }
+
+    // Update the dim-display for a given preset and optional crop data
+    function updateDimDisplayForId(presetId, data) {
+        try {
+            const display = document.getElementById('dim-display');
+            if (!display) return;
+            const preset = presetConfig[presetId] || {};
+            const allowUpscale = preset.exportSize && !!preset.exportSize.allowUpscale;
+            const scalingEnabled = exportScaleEnabled.hasOwnProperty(presetId) ? !!exportScaleEnabled[presetId] : ((preset.exportSize && preset.exportSize.width && preset.exportSize.height) ? true : false);
+
+            if (data) {
+                const srcW = Math.round(data.width);
+                const srcH = Math.round(data.height);
+                let outW = srcW, outH = srcH;
+                if (preset.exportSize && scalingEnabled) {
+                    outW = Number(preset.exportSize.width) || outW;
+                    outH = Number(preset.exportSize.height) || outH;
+                    if (!preset.exportSize.allowUpscale) {
+                        const scale = Math.min(1, srcW / outW, srcH / outH);
+                        outW = Math.max(1, Math.round(outW * scale));
+                        outH = Math.max(1, Math.round(outH * scale));
+                    }
+                }
+                const minSize = preset.minSize || 500;
+                const minText = (Math.min(srcW, srcH) < minSize) ? ` <b>| TOO SMALL — min ${minSize}px</b>` : '';
+                const willUpscale = (outW > srcW || outH > srcH);
+                const upscaleText = (willUpscale && allowUpscale && scalingEnabled) ? ` <b>| Will upscale on export</b>` : '';
+                const allowStateText = preset.exportSize ? ` | Upscale: ${allowUpscale ? 'allowed' : 'disabled'}` : '';
+                display.className = Math.min(srcW, srcH) < minSize ? 'warning' : '';
+                display.innerHTML = `Crop: ${srcW}x${srcH}px | Output: ${outW}x${outH}px${minText}${upscaleText}${upscaleText ? '' : allowStateText}`;
+            } else {
+                const min = preset.minSize || 500;
+                let outText = '—';
+                if (preset.exportSize && scalingEnabled) outText = `${preset.exportSize.width}x${preset.exportSize.height}`;
+                const allowStateText = preset.exportSize ? ` <text>Upscale: ${allowUpscale ? 'allowed' : 'disabled'}</text>` : '';
+                display.className = '';
+                display.innerHTML = `Preset: ${preset.title || presetId} | Min: ${min}px | Output: ${outText}${allowStateText}`;
+            }
+        } catch (e) { /* ignore */ }
     }
 
     // Toggle link state for a preset
