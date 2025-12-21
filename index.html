@@ -175,6 +175,7 @@
     const linkedState = {};
     const lastCenters = {};
     const adjustedState = {};
+    const collapsedGroups = {};
 
     // Persisted state keys
     const STORAGE_KEY = 'paracrop_state_v1';
@@ -192,7 +193,7 @@
 
     function saveStateToStorage() {
         try {
-            const payload = { linkedState, cropMemory, adjustedState, exportScaleEnabled };
+            const payload = { linkedState, cropMemory, adjustedState, exportScaleEnabled, collapsedGroups };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
         } catch (e) {
             console.warn('Failed to save Paracrop state', e);
@@ -208,6 +209,7 @@
             if (parsed.cropMemory) Object.assign(cropMemory, parsed.cropMemory);
             if (parsed.adjustedState) Object.assign(adjustedState, parsed.adjustedState);
             if (parsed.exportScaleEnabled) Object.assign(exportScaleEnabled, parsed.exportScaleEnabled);
+            if (parsed.collapsedGroups) Object.assign(collapsedGroups, parsed.collapsedGroups);
         } catch (e) {
             console.warn('Failed to load Paracrop state', e);
         }
@@ -227,14 +229,42 @@
             groups[cfg.group].push({ id, ...cfg });
         });
 
-        Object.keys(groups).forEach(groupName => {
+        const groupNames = Object.keys(groups);
+        groupNames.forEach((groupName, index) => {
+            // Initialize collapsed state: first group expanded, rest collapsed (if not already set)
+            if (!collapsedGroups.hasOwnProperty(groupName)) {
+                collapsedGroups[groupName] = index !== 0;
+            }
+        });
+
+        groupNames.forEach(groupName => {
             const label = document.createElement('div');
             label.className = 'group-label';
-            label.innerText = groupName;
-            container.appendChild(label);
-
+            label.style.cursor = 'pointer';
+            label.style.userSelect = 'none';
+            
+            const indicator = document.createElement('span');
+            indicator.className = 'collapse-indicator';
+            indicator.innerText = collapsedGroups[groupName] ? '▶' : '▼';
+            
+            const text = document.createElement('span');
+            text.innerText = groupName;
+            
+            label.appendChild(indicator);
+            label.appendChild(text);
+            
             const list = document.createElement('div');
             list.className = 'crop-list';
+            list.style.display = collapsedGroups[groupName] ? 'none' : 'flex';
+            
+            label.addEventListener('click', () => {
+                collapsedGroups[groupName] = !collapsedGroups[groupName];
+                list.style.display = collapsedGroups[groupName] ? 'none' : 'flex';
+                indicator.innerText = collapsedGroups[groupName] ? '▶' : '▼';
+                saveStateToStorage();
+            });
+            
+            container.appendChild(label);
             
             groups[groupName].forEach(cfg => {
                 const btn = document.createElement('button');
@@ -265,6 +295,7 @@
                 // If preset has exportSize, show a small badge of target size
                 const sizeBadge = document.createElement('span');
                 sizeBadge.className = 'size-badge';
+                sizeBadge.title = 'Toggle export scaling for this preset';
                 if (cfg.exportSize && cfg.exportSize.width && cfg.exportSize.height) {
                     sizeBadge.innerText = `${cfg.exportSize.width}x${cfg.exportSize.height}`;
                 } else {

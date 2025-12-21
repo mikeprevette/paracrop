@@ -92,6 +92,20 @@ header {
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.2s;
+}
+
+.group-label:hover {
+    color: #666;
+}
+
+.collapse-indicator {
+    font-size: 0.6rem;
+    display: inline-block;
+    transition: transform 0.2s;
 }
 
 .crop-list {
