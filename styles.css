@@ -102,6 +102,10 @@ header {
     color: #666;
 }
 
+.group-label.has-modified {
+    color: var(--success);
+}
+
 .collapse-indicator {
     font-size: 0.6rem;
     display: inline-block;

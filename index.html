@@ -242,6 +242,11 @@
             label.className = 'group-label';
             label.style.cursor = 'pointer';
             label.style.userSelect = 'none';
+            label.setAttribute('data-group', groupName);
+            
+            // Check if any preset in this group is modified
+            const hasModified = groups[groupName].some(cfg => adjustedState[cfg.id]);
+            if (hasModified) label.classList.add('has-modified');
             
             const indicator = document.createElement('span');
             indicator.className = 'collapse-indicator';
@@ -378,6 +383,20 @@
         });
     }
     
+    // Helper function to update group label state when presets are modified
+    function updateGroupLabelState(presetId) {
+        const preset = presetConfig[presetId];
+        if (!preset || !preset.group) return;
+        const label = document.querySelector(`.group-label[data-group="${preset.group}"]`);
+        if (!label) return;
+        
+        // Check if any preset in this group is modified
+        const groupPresets = Object.entries(presetConfig).filter(([id, cfg]) => 
+            cfg && cfg.group === preset.group && !id.startsWith('__')
+        );
+        const hasModified = groupPresets.some(([id]) => adjustedState[id]);
+        label.classList.toggle('has-modified', hasModified);
+    }
 
     function processFile(file) {
         if (!file) return;
@@ -441,6 +460,7 @@
                 cropMemory[currentId] = { ...d };
                 if (currentBtn) currentBtn.classList.add('is-modified');
                 adjustedState[currentId] = true;
+                updateGroupLabelState(currentId);
 
                 // Apply delta to linked presets if center moved
                 const prev = lastCenters[currentId];
@@ -600,6 +620,7 @@
         delete lastCenters[id];
         delete adjustedState[id];
         parentBtn.classList.remove('is-modified');
+        updateGroupLabelState(id);
         
         // Clear badge warning state
         const badge = sizeBadges[id];
@@ -690,6 +711,7 @@
             lastCenters[id] = { x: newX + d.width/2, y: newY + d.height/2 };
             // linked move counts as an adjustment
             adjustedState[id] = true;
+            updateGroupLabelState(id);
         });
         // persist linked crop changes all at once
         saveStateToStorage();
