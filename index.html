@@ -53,8 +53,8 @@
             <div id="dynamic-presets"></div>
             <div class="group-label">Tools</div>
             <button class="crop-btn" style="width:100%" onclick="toggleOverlays()"><span id="toggle-text">Hide UI Guides</span></button>
+            <button id="dataBtn" class="crop-btn" onclick="showCoordinateOverlay()" disabled style="width:100%; margin-top:8px;">View Crop Data Points</button>
             <button id="resetViewBtn" class="crop-btn" onclick="resetImageView()" disabled style="width:100%; display:none; margin-top:8px;">Reset Image Position & Zoom</button>
-
             <!-- export panel moved into editor column -->
         </div>
 
@@ -63,12 +63,6 @@
             <div id="dim-display">Waiting for image ...</div>
             <!-- editor controls moved here from sidebar -->
             <div style="width:100%; margin-top:18px;">
-                <div class="btn-stack" style="flex-direction: row; gap: 10px;">
-                    <button class="action-btn download-btn" id="downloadBtn" onclick="performCrop()" disabled style="flex:1;">Download Current</button>
-                    <button class="action-btn bulk-btn" id="bulkBtn" onclick="generateGallery()" disabled style="flex:1;">Review All Adjusted</button>
-                    <button class="action-btn data-btn" id="dataBtn" onclick="showCoordinateOverlay()" disabled style="flex:1;">View Crop Data Points</button>
-                </div>
-
                 <div id="export-controls-wrapper" style="margin-top:12px; display:flex; justify-content:flex-start;">
                     <div class="export-config" id="export-config" style="display:none; flex-direction:row; gap:12px; align-items:center;">
                         <label for="templateSelect" style="font-size:0.8rem; color:#666; margin-right:4px;">Template</label>
@@ -86,6 +80,10 @@
                             <div id="exampleFilename" style="font-family: monospace; background:#f6f7f8; color:#222; padding:6px 10px; border-radius:6px; border:1px solid #e6e6e6;">—</div>
                         </div>
                     </div>
+                </div>
+                <div class="btn-stack" style="flex-direction: row; gap: 10px;">
+                    <button class="action-btn download-btn" id="downloadBtn" onclick="performCrop()" disabled style="flex:1;">Download Current</button>
+                    <button class="action-btn bulk-btn" id="bulkBtn" onclick="generateGallery()" disabled style="flex:1;">Review and Export</button>
                 </div>
             </div>
         </div>

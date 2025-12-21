@@ -310,9 +310,6 @@ img {
     background: var(--bulk);
 }
 
-.data-btn {
-    background: var(--info);
-}
 
 .action-btn:disabled {
     background: #ccc;
