@@ -16,6 +16,7 @@ ParaCrop uses **localStorage-persisted state** (`STORAGE_KEY = 'paracrop_state_v
 - `linkedState` – tracks which presets have linked center-movement
 - `adjustedState` – flags presets the user has manually modified
 - `exportScaleEnabled` – per-preset toggle for scaled exports
+- `collapsedGroups` – tracks expand/collapse state of preset groups
 
 **Critical**: State is cleared on page reload (detected via `performance.navigation`) but preserved on navigation away/back.
 
@@ -41,7 +42,7 @@ Presets define crop configurations loaded from [presets.json](../presets.json):
 }
 ```
 
-The `__meta__` key in presets.json provides template/country options for filename generation.
+The `__meta__` key in presets.json provides template/country options for filename generation, plus quality settings (`jpegQuality`, `thumbnailQuality`).
 
 ## Core Functionality
 
@@ -90,11 +91,16 @@ Manual testing checklist (no automated tests):
 
 ## Critical Implementation Details
 
+### UI Organization
+**Collapsible Groups**: Preset groups in the sidebar can be expanded/collapsed by clicking the group label. State persists in localStorage. First group expands by default, others collapsed.
+
 ### State Flags & Button States
 Three independent systems control preset button styling:
 - `.active` class: Currently selected preset (only one at a time)
 - `.is-modified` class: User has adjusted this preset's crop (shows green status dot)
 - `.linked` class: Preset participates in linked movement (shows link icon styling)
+
+**Group Label States**: Group labels turn green (`.has-modified` class) when any preset in that group has been adjusted. Updated dynamically by `updateGroupLabelState(presetId)` helper function.
 
 ### Size Badge Warning States
 Size badges change color based on crop validation:
